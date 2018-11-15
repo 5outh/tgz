@@ -4,15 +4,16 @@
 {-# LANGUAGE RankNTypes        #-}
 module TheGreatZimbabwe where
 
-import           Prelude                hiding (round)
+import           Prelude                    hiding (round)
 
 import           Control.Lens
-import qualified Data.Map.Strict        as M
-import           Data.Maybe             (isJust)
-import qualified Data.Set               as S
-import qualified Data.Text              as T
+import qualified Data.Map.Strict            as M
+import           Data.Maybe                 (isJust)
+import qualified Data.Set                   as S
+import qualified Data.Text                  as T
 import           Data.Validation
 import           Numeric.Natural
+import           TheGreatZimbabwe.MapLayout
 import           TheGreatZimbabwe.Types
 
 data GameError = InvalidAction T.Text
@@ -94,7 +95,7 @@ useSpecialist = undefined
   use Shaman       = undefined
   use RainCeremony = undefined
   use Nomads       = undefined
-  use Builder      = undefined
+  use (Builder _)  = undefined
 
 buildMonument
   :: Location -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture

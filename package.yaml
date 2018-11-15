@@ -17,6 +17,9 @@ dependencies:
   - containers
   - validation
   - lens
+  - linear
+  - random-shuffle
+  - MonadRandom
 
 library:
   source-dirs: library
