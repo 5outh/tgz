@@ -1,0 +1,37 @@
+name:                tgz
+version:             0.1.0.0
+synopsis:            The Great Zimbabwe online (copyright Splotter Spellen)
+#description:
+homepage:            https://github.com/5outh/tgz#readme
+license:             MIT
+author:              Benjamin Kovach
+maintainer:          bkovach13@gmail.com
+copyright:           2018 Benjamin Kovach
+category:            Game
+extra-source-files:
+- README.md
+
+dependencies:
+  - base >= 4.7 && < 5
+  - text
+  - containers
+  - validation
+  - lens
+
+library:
+  source-dirs: library
+
+executables:
+  tgz:
+    dependencies:
+      - tgz
+    source-dirs:      src
+    main:             Main.hs
+
+tests:
+  test:
+    dependencies:
+      - tgz
+      - hspec
+    main: Main.hs
+    source-dirs: tests
