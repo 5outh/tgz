@@ -187,8 +187,11 @@ makeLensesWith camelCaseFields ''Player
 data UsedMarker = NotUsed | Used | UsedTwice
 
 data GenerosityOfKingsState = GenerosityOfKingsState
-  { generosityOfKingsStatePlaques       :: [(Empire, Natural)]
-  -- ^ Ordered plaques and associated cattle amount
+  { generosityOfKingsStatePlaques       :: [Empire]
+  -- ^ Ordered plaques
+  , generosityOfKingsStateCattlePool    :: Natural
+  -- ^ Total number of cattle that have been bid (this along with plaques
+  -- is enough to reconstruct the view)
   , generosityOfKingsStateLastBid       :: Natural
   -- ^ The last bid made; next bid must be higher (or pass)
   , generosityOfKingsStatePlayersPassed :: [PlayerId]
@@ -203,11 +206,15 @@ data Phase
   | ReligionAndCulture
   | Revenues
   | LetUsCompareMythologies
+    deriving (Eq)
 
 data Round = Round
   { roundPlayers                :: [PlayerId]
   -- ^ Ordered list representing the order of play, determined by
-  -- the generosity of kings.
+  -- (a) VR in the generosity of kings phase, and
+  -- (b) by the generosity of kings phase in other phases.
+  , roundCurrentPlayer          :: PlayerId
+  -- ^ The current player of the round
   , roundUsedMarkers            :: M.Map Location UsedMarker
   -- ^ Used marker locations on the map
   , roundGenerosityOfKingsState :: GenerosityOfKingsState

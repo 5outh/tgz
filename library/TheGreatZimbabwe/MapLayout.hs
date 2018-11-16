@@ -16,8 +16,6 @@ import           TheGreatZimbabwe.Types
 -- Note: I think this is easier if we eat the randomness cost at the beginning
 -- and not have to worry about threading a StdGen througout the game.
 
--- IDEA: [[Location]], zip them together
-
 data Tiles4 = Tiles4
   { tiles4Tile1 :: Tile
   , tiles4Tile2 :: Tile

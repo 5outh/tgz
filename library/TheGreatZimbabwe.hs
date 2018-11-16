@@ -1,12 +1,15 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PolyKinds         #-}
-{-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE PolyKinds           #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 module TheGreatZimbabwe where
 
 import           Prelude                    hiding (round)
 
 import           Control.Lens
+import           Control.Monad
 import qualified Data.Map.Strict            as M
 import           Data.Maybe                 (isJust)
 import qualified Data.Set                   as S
@@ -16,16 +19,19 @@ import           Numeric.Natural
 import           TheGreatZimbabwe.MapLayout
 import           TheGreatZimbabwe.Types
 
+tshow :: Show a => a -> T.Text
+tshow = T.pack . show
+
 data GameError = InvalidAction T.Text
   deriving (Show, Eq)
 
-gameError :: T.Text -> Validation [GameError] a
-gameError = Failure . pure . InvalidAction
+invalidAction :: T.Text -> Either GameError a
+invalidAction = Left . InvalidAction
 
 -- * Pure functions from game to game
 
 -- TODO: What actually *is* this? some m, probably
-data PlayerAction s = PlayerAction { getPlayerAction :: Validation [GameError] Game }
+data PlayerAction s = PlayerAction { getPlayerAction :: Either GameError Game }
 
 data GameEvent phase
 
@@ -38,14 +44,64 @@ placeStartingMonument = undefined
 
 data GenerosityOfKingsAction = Bid Natural | Pass
 
+impliesInvalid :: Bool -> T.Text -> Either GameError ()
+predicate `impliesInvalid` err = when predicate $ invalidAction err
+
+getPlayer :: PlayerId -> Game -> Either GameError Player
+getPlayer playerId game = case M.lookup playerId (game ^. players) of
+  Nothing ->
+    invalidAction $ "Player with id " <> tshow playerId <> " does not exist."
+  Just player -> pure player
+
+isPlayersTurn :: PlayerId -> Game -> Either GameError ()
+isPlayersTurn playerId game = when (game ^. round . currentPlayer /= playerId)
+  $ invalidAction "It is not your turn."
+
+-- TODO: How to cycle players in a foolproof way?
+
 bid :: Natural -> PlayerId -> Game -> PlayerAction 'GenerosityOfKings
-bid = undefined
+bid amount playerId game = PlayerAction $ do
+  isPlayersTurn playerId game
+
+  (game ^. round . currentPhase /= GenerosityOfKings)
+    `impliesInvalid` "You can only take the bid action in the Generosity of Kings phase"
+
+  (playerId `elem` game ^. playersPassedLens)
+    `impliesInvalid` "You cannot bid; you have already passed."
+
+  player <- getPlayer playerId game
+
+  let notEnoughCattle =
+        "You do not have enough cattle (need " <> tshow amount <> ")."
+  (player ^. cattle < amount) `impliesInvalid` notEnoughCattle
+
+  (amount < minimumBid)
+    `impliesInvalid` ("You must bid " <> tshow minimumBid <> " cattle or more.")
+
+  pure $ modifyGame game
+ where
+  playersPassedLens :: Lens' Game [PlayerId]
+  playersPassedLens = round . generosityOfKingsState . playersPassed
+
+  minimumBid :: Natural
+  minimumBid = succ $ game ^. round . generosityOfKingsState . lastBid
+
+  modifyGenerosityOfKings :: GenerosityOfKingsState -> GenerosityOfKingsState
+  modifyGenerosityOfKings gok = gok & cattlePool +~ amount
+
+  modifyPlayer :: Player -> Player
+  modifyPlayer = cattle -~ amount
+
+  modifyGame :: Game -> Game
+  modifyGame =
+    over (players . at playerId) (fmap modifyPlayer)
+      . over (round . generosityOfKingsState) modifyGenerosityOfKings
 
 pass :: PlayerId -> Game -> PlayerAction 'GenerosityOfKings
-pass playerId game =
-  PlayerAction $ if (playerId `notElem` game ^. playersPassedLens)
-    then Success $ game & playersPassedLens %~ (playerId :)
-    else gameError "You have already passed"
+pass playerId game = PlayerAction $ do
+  (playerId `elem` game ^. playersPassedLens)
+    `impliesInvalid` "You have already passed."
+  pure $ game & playersPassedLens %~ (playerId :)
  where
   playersPassedLens :: Lens' Game [PlayerId]
   playersPassedLens = round . generosityOfKingsState . playersPassed
