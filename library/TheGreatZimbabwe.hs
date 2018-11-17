@@ -16,24 +16,10 @@ import qualified Data.Set                   as S
 import qualified Data.Text                  as T
 import           Data.Validation
 import           Numeric.Natural
+import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.MapLayout
+import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
-
-tshow :: Show a => a -> T.Text
-tshow = T.pack . show
-
-data GameError = InvalidAction T.Text
-  deriving (Show, Eq)
-
-invalidAction :: T.Text -> Either GameError a
-invalidAction = Left . InvalidAction
-
--- * Pure functions from game to game
-
--- TODO: What actually *is* this? some m, probably
-data PlayerAction s = PlayerAction { getPlayerAction :: Either GameError Game }
-
-data GameEvent phase
 
 -- * Setup
 

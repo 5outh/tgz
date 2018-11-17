@@ -1,5 +1,7 @@
+{-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE KindSignatures         #-}
 {-# LANGUAGE LambdaCase             #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE OverloadedStrings      #-}
@@ -9,12 +11,13 @@ module TheGreatZimbabwe.Types where
 
 import           Control.Lens
 import           Control.Lens.TH
-import qualified Data.Map.Strict as M
-import           Data.Maybe      (isJust)
-import qualified Data.Set        as S
-import qualified Data.Text       as T
+import qualified Data.Map.Strict        as M
+import           Data.Maybe             (isJust)
+import qualified Data.Set               as S
+import qualified Data.Text              as T
 import           Data.Validation
 import           Numeric.Natural
+import           TheGreatZimbabwe.Error
 
 data Location = Location
   { locationX :: !Natural
@@ -83,7 +86,7 @@ data TechnologyCard = TechnologyCard
   , technologyCardVictoryRequirement :: Natural
   , technologyCardVictoryPoints      :: Natural
   , technologyCardCost               :: Natural
-  }
+  } deriving (Eq, Ord)
 
 makeLensesWith camelCaseFields ''TechnologyCard
 
@@ -101,6 +104,7 @@ data Specialist
   -- this card.
   | Nomads
   -- ^ Pay 2 cattle to ignore zoning restrictions when building a new monument
+    deriving (Eq, Ord)
 
 specialistVR :: Specialist -> Natural
 specialistVR = \case
@@ -158,6 +162,8 @@ newtype PlayerId = PlayerId { playerIdPlayerId :: Natural } deriving (Show, Eq, 
 
 makeLensesWith camelCaseFields ''PlayerId
 
+-- Little idea: this could be encoded as a Monoid and state changes could be
+-- encoded as mempty{ change }. could the whole game be done that way?
 data Player = Player
   { playerInfo               :: PlayerInfo
   -- ^ Info about the human player
@@ -165,14 +171,15 @@ data Player = Player
   -- ^ Player's current victory requirement
   , playerVictoryPoints      :: Natural
   -- ^ Player's current victory points
-  , playerEmpire             :: Empire
-  -- ^ The Empire the Player belongs to.
+  , playerEmpire             :: Maybe Empire
+  -- ^ The Empire the Player belongs to. Players have to choose this at the
+  -- beginning of the game, so it's initially empty.
   , playerCattle             :: Natural
   -- ^ Number of cattle that a Player currently has. Start amount: 3
   , playerMonuments          :: M.Map Location Natural
   -- ^ Locations of player-owned monuments on the map, along with monument height
-  , playerCraftsmen          :: S.Set Location
-  -- ^ Locations of player-owned craftsmen on the map
+  , playerCraftsmen          :: M.Map Location Craftsman
+  -- ^ Locations of player-owned craftsmen on the map (each individual owned square)
   , playerTechnologyCards    :: M.Map TechnologyCard Natural
   -- ^ Player-owned technology cards, along with the price other players must pay to use them
   , playerSpecialists        :: S.Set Specialist
@@ -240,49 +247,6 @@ data Game = Game
 
 makeLensesWith camelCaseFields ''Game
 
-newGameCraftsmen :: M.Map Craftsman [TechnologyCard]
-newGameCraftsmen = M.fromList
-  [ Potter .: potters
-  , IvoryCarver .: ivoryCarvers
-  , WoodCarver .: woodCarvers
-  , DiamondCutter .: diamondCutters
-  ]
- where
-  (.:) = (,)
-  -- VR/VP/Cost
-  potters =
-    [ TechnologyCard "Potter1" Potter 3 1 2
-    , TechnologyCard "Potter2" Potter 4 1 2
-    ]
-
-  ivoryCarvers =
-    [ TechnologyCard "IvoryCarver1" IvoryCarver 2 1 2
-    , TechnologyCard "IvoryCarver2" IvoryCarver 3 1 2
-    ]
-
-  woodCarvers =
-    [ TechnologyCard "WoodCarver1" WoodCarver 3 1 2
-    , TechnologyCard "WoodCarver2" WoodCarver 4 1 2
-    ]
-
-  diamondCutters =
-    [ TechnologyCard "DiamondCutter1" DiamondCutter 1 3 10
-    , TechnologyCard "DiamondCutter1" DiamondCutter 2 3 10
-    ]
-
-  vesselMakers =
-    [ TechnologyCard "VesselMaker1" VesselMaker 3 2 4
-    , TechnologyCard "VesselMaker2" VesselMaker 4 2 4
-    ]
-  throneMakers =
-    [ TechnologyCard "ThroneMaker1" ThroneMaker 3 2 4
-    , TechnologyCard "ThroneMaker1" ThroneMaker 4 2 4
-    ]
-  sculptors =
-    [ TechnologyCard "Sculptor1" Sculptor 3 2 4
-    , TechnologyCard "Sculptor1" Sculptor 4 2 4
-    ]
-
 -- | Resource a craftsman requires
 craftsmanResource :: Craftsman -> Resource
 craftsmanResource = \case
@@ -302,3 +266,8 @@ craftsmanAssociatedCraftsman = \case
   ThroneMaker -> Just IvoryCarver
   Sculptor    -> Just WoodCarver
   _           -> Nothing
+
+-- * Pure functions from game to game
+
+data PlayerAction (phase :: Phase) = PlayerAction { getPlayerAction :: Either GameError Game }
+data GameEvent (phase :: Phase) = GameEvent { getGameEvent :: Either GameError Game }

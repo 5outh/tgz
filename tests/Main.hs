@@ -10,6 +10,7 @@ import qualified Data.Set               as S
 import           Data.Validation
 import           Test.Hspec
 import           TheGreatZimbabwe
+import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Types
 
 main :: IO ()
@@ -75,10 +76,10 @@ p1 = Player
   { playerInfo = PlayerInfo (Username "5outh") "bkovach13@gmail.com"
   , playerVictoryRequirement = 20
   , playerVictoryPoints      = 0
-  , playerEmpire             = Kilwa
+  , playerEmpire             = Just Kilwa
   , playerCattle             = 3
   , playerMonuments          = M.empty
-  , playerCraftsmen          = S.empty
+  , playerCraftsmen          = M.empty
   , playerTechnologyCards    = M.empty
   , playerSpecialists        = S.empty
   , playerGod                = Nothing
@@ -89,10 +90,10 @@ p2 = Player
   { playerInfo               = PlayerInfo (Username "arcas") "arcas@example.com"
   , playerVictoryRequirement = 20
   , playerVictoryPoints      = 0
-  , playerEmpire             = Zulu
+  , playerEmpire             = Just Zulu
   , playerCattle             = 3
   , playerMonuments          = M.empty
-  , playerCraftsmen          = S.empty
+  , playerCraftsmen          = M.empty
   , playerTechnologyCards    = M.empty
   , playerSpecialists        = S.empty
   , playerGod                = Nothing
