@@ -239,15 +239,26 @@ data UsedMarker = NotUsed | Used | UsedTwice
 
 data GenerosityOfKingsState = GenerosityOfKingsState
   { generosityOfKingsStatePlaques       :: [Empire]
-  -- ^ Ordered plaques
-  , generosityOfKingsStateCattlePool    :: Natural
+  -- ^ Ordered plaques (static)
+  , generosityOfKingsStateCattlePool    :: Sum Natural
   -- ^ Total number of cattle that have been bid (this along with plaques
   -- is enough to reconstruct the view)
-  , generosityOfKingsStateLastBid       :: Natural
+  , generosityOfKingsStateLastBid       :: Last Natural
   -- ^ The last bid made; next bid must be higher (or pass)
   , generosityOfKingsStatePlayersPassed :: [PlayerId]
   -- ^ Which players have passed, in what order?
   }
+
+instance Semigroup GenerosityOfKingsState where
+  g1 <> g2 = GenerosityOfKingsState
+    { generosityOfKingsStatePlaques = on (<>) generosityOfKingsStatePlaques g1 g2
+    , generosityOfKingsStateCattlePool = on (<>) generosityOfKingsStateCattlePool g1 g2
+    , generosityOfKingsStateLastBid = on (<>) generosityOfKingsStateLastBid g1 g2
+    , generosityOfKingsStatePlayersPassed = on (<>) generosityOfKingsStatePlayersPassed g1 g2
+    }
+
+instance Monoid GenerosityOfKingsState where
+  mempty = GenerosityOfKingsState mempty mempty mempty mempty
 
 makeLensesWith camelCaseFields ''GenerosityOfKingsState
 

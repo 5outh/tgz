@@ -87,10 +87,12 @@ bid amount playerId game = PlayerAction $ do
   playersPassedLens = round . generosityOfKingsState . playersPassed
 
   minimumBid :: Natural
-  minimumBid = succ $ game ^. round . generosityOfKingsState . lastBid
+  minimumBid =
+    maybe 0 succ $ getLast (game ^. round . generosityOfKingsState . lastBid)
 
   modifyGenerosityOfKings :: GenerosityOfKingsState -> GenerosityOfKingsState
-  modifyGenerosityOfKings gok = gok & cattlePool +~ amount
+  modifyGenerosityOfKings gok =
+    gok <> mempty { generosityOfKingsStateCattlePool = Sum (-amount) }
 
   modifiedPlayer = mempty { playerCattle = Sum (negate $ fromIntegral amount) }
 

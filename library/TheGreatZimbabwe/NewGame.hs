@@ -42,8 +42,8 @@ newGame players = GameEvent <$> do
             , roundUsedMarkers            = mempty
             , roundGenerosityOfKingsState = GenerosityOfKingsState
               { generosityOfKingsStatePlaques       = [] -- Nothing yet, I don't love this
-              , generosityOfKingsStateCattlePool    = 0
-              , generosityOfKingsStateLastBid       = 0
+              , generosityOfKingsStateCattlePool    = Sum 0
+              , generosityOfKingsStateLastBid       = Last Nothing
               , generosityOfKingsStatePlayersPassed = []
               }
             , roundCurrentPhase           = Setup
