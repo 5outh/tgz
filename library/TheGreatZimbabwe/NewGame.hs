@@ -8,6 +8,7 @@ import           Data.Bifunctor
 import qualified Data.Map.Strict            as M
 import           Data.Monoid
 import qualified Data.Set                   as S
+import           Safe                       (headMay)
 import           System.Random.Shuffle
 import           TheGreatZimbabwe.Error
 import qualified TheGreatZimbabwe.MapLayout as MapLayout
@@ -38,7 +39,7 @@ newGame players = GameEvent <$> do
           gamePlayers = Merge $ M.fromList $ map (second newPlayer) players
           gameRound   = Round
             { roundPlayers                = playerOrder
-            , roundCurrentPlayer          = head playerOrder
+            , roundCurrentPlayer          = Last (headMay playerOrder)
             , roundUsedMarkers            = mempty
             , roundGenerosityOfKingsState = GenerosityOfKingsState
               { generosityOfKingsStatePlaques       = [] -- Nothing yet, I don't love this

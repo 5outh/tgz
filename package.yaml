@@ -23,6 +23,7 @@ dependencies:
   - persistent
   - persistent-postgresql
   - persistent-template
+  - safe
 
 library:
   source-dirs: library

@@ -276,7 +276,7 @@ data Round = Round
   -- ^ Ordered list representing the order of play, determined by
   -- (a) VR in the generosity of kings phase, and
   -- (b) by the generosity of kings phase in other phases.
-  , roundCurrentPlayer          :: PlayerId
+  , roundCurrentPlayer          :: Last PlayerId
   -- ^ The current player of the round
   , roundUsedMarkers            :: Merge Location (Last UsedMarker)
   -- ^ Used marker locations on the map
@@ -284,6 +284,18 @@ data Round = Round
   -- ^ State used in the Generosity of kings phase
   , roundCurrentPhase           :: Last Phase
   }
+
+instance Semigroup Round where
+  r1 <> r2 = Round
+    { roundPlayers = on (<>) roundPlayers r1 r2
+    , roundCurrentPlayer = on (<>) roundCurrentPlayer r1 r2
+    , roundUsedMarkers = on (<>) roundUsedMarkers r1 r2
+    , roundGenerosityOfKingsState = on (<>) roundGenerosityOfKingsState r1 r2
+    , roundCurrentPhase = on (<>) roundCurrentPhase r1 r2
+    }
+
+instance Monoid Round where
+  mempty = Round mempty mempty mempty mempty mempty
 
 makeLensesWith camelCaseFields ''Round
 
@@ -300,6 +312,18 @@ data Game = Game
   -- ^ Remaining Craftsmen of each type
   , gameWinner    :: Alt Maybe PlayerId
   }
+
+instance Semigroup Game where
+  g1 <> g2 = Game
+    { gamePlayers = on (<>) gamePlayers g1 g2
+    , gameRound = on (<>) gameRound g1 g2
+    , gameMapLayout = on (<>) gameMapLayout g1 g2
+    , gameCraftsmen = on (<>) gameCraftsmen g1 g2
+    , gameWinner = on (<>) gameWinner g1 g2
+    }
+
+instance Monoid Game where
+  mempty = Game mempty mempty mempty mempty mempty
 
 makeLensesWith camelCaseFields ''Game
 

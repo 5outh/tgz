@@ -57,8 +57,9 @@ getPlayer playerId game =
     Just player -> pure player
 
 isPlayersTurn :: PlayerId -> Game -> Either GameError ()
-isPlayersTurn playerId game = when (game ^. round . currentPlayer /= playerId)
-  $ invalidAction "It is not your turn."
+isPlayersTurn playerId game =
+  when (game ^. round . currentPlayer . to getLast /= Just playerId)
+    $ invalidAction "It is not your turn."
 
 -- TODO: How to cycle players in a foolproof way?
 
