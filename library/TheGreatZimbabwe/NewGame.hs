@@ -6,6 +6,7 @@ module TheGreatZimbabwe.NewGame where
 
 import           Data.Bifunctor
 import qualified Data.Map.Strict            as M
+import           Data.Monoid
 import           System.Random.Shuffle
 import           TheGreatZimbabwe.Error
 import qualified TheGreatZimbabwe.MapLayout as MapLayout
@@ -26,18 +27,13 @@ newGame players = GameEvent <$> do
     Left  err           -> pure (Left err)
     Right gameMapLayout -> do
       playerOrder <- shuffleM $ map fst players
-      let newPlayer playerInfo' = Player
-            { playerInfo               = playerInfo'
-            , playerVictoryRequirement = 20
-            , playerVictoryPoints      = 0
-            , playerEmpire             = Nothing
-            , playerCattle             = 3
-            , playerMonuments          = mempty
-            , playerCraftsmen          = mempty
-            , playerTechnologyCards    = mempty
-            , playerSpecialists        = mempty
-            , playerGod                = Nothing
-            }
+      let newPlayer playerInfo' = mempty { playerInfo = Alt (Just playerInfo')
+                                         , playerVictoryRequirement = Sum 20
+                                         , playerVictoryPoints = Sum 0
+                                         , playerEmpire = Alt Nothing
+                                         , playerCattle = Sum 3
+                                         , playerGod = Alt Nothing
+                                         }
           gamePlayers = M.fromList $ map (second newPlayer) players
           gameRound   = Round
             { roundPlayers                = playerOrder

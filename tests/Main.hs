@@ -2,22 +2,32 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Prelude                hiding (round)
+import           Prelude                  hiding (round)
 
 import           Control.Lens
-import qualified Data.Map.Strict        as M
-import qualified Data.Set               as S
+import qualified Data.Map.Strict          as M
+import           Data.Monoid
+import qualified Data.Set                 as S
 import           Data.Validation
 import           Test.Hspec
 import           TheGreatZimbabwe
 import           TheGreatZimbabwe.Error
+import           TheGreatZimbabwe.NewGame
 import           TheGreatZimbabwe.Types
 
 main :: IO ()
 main = hspec $ do
-  describe "test suite" $ do
-    it "runs" $ do
-      True `shouldBe` True
+  describe "pre-setup" $ do
+    it "lets a player choose an empire" $ do
+      Right game <- getGameEvent <$> newGame
+        [ (PlayerId 1, (PlayerInfo (Username "5outh") "bkovach13@gmail.com"))
+        , (PlayerId 2, (PlayerInfo (Username "arcas") "arcas@example.com"))
+        ]
+      let Right steppedGame =
+            getPlayerAction $ (chooseEmpire Zulu (PlayerId 1) game)
+          Right newPlayer = getPlayer (PlayerId 1) steppedGame
+
+      playerEmpire newPlayer `shouldBe` Alt (Just Zulu)
 
   describe "generosity of kings" $ do
     it "lets a player pass" $ do
@@ -72,29 +82,20 @@ emptyGame = Game
   }
 
 p1 :: Player
-p1 = Player
-  { playerInfo = PlayerInfo (Username "5outh") "bkovach13@gmail.com"
-  , playerVictoryRequirement = 20
-  , playerVictoryPoints      = 0
-  , playerEmpire             = Just Kilwa
-  , playerCattle             = 3
-  , playerMonuments          = M.empty
-  , playerCraftsmen          = M.empty
-  , playerTechnologyCards    = M.empty
-  , playerSpecialists        = S.empty
-  , playerGod                = Nothing
+p1 = mempty
+  { playerInfo               = Alt
+    (Just $ PlayerInfo (Username "5outh") "bkovach13@gmail.com")
+  , playerVictoryRequirement = Sum 20
+  , playerEmpire             = Alt (Just Kilwa)
+  , playerCattle             = Sum 3
+  , playerGod                = Alt Nothing
   }
 
 p2 :: Player
-p2 = Player
-  { playerInfo               = PlayerInfo (Username "arcas") "arcas@example.com"
-  , playerVictoryRequirement = 20
-  , playerVictoryPoints      = 0
-  , playerEmpire             = Just Zulu
-  , playerCattle             = 3
-  , playerMonuments          = M.empty
-  , playerCraftsmen          = M.empty
-  , playerTechnologyCards    = M.empty
-  , playerSpecialists        = S.empty
-  , playerGod                = Nothing
+p2 = mempty
+  { playerInfo = Alt (Just $ PlayerInfo (Username "arcas") "arcas@example.com")
+  , playerVictoryRequirement = Sum 20
+  , playerEmpire             = Alt (Just Zulu)
+  , playerCattle             = Sum 3
+  , playerGod                = Alt Nothing
   }

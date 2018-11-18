@@ -11,13 +11,25 @@ module TheGreatZimbabwe.Types where
 
 import           Control.Lens
 import           Control.Lens.TH
+import           Data.Function          (on)
 import qualified Data.Map.Strict        as M
 import           Data.Maybe             (isJust)
+import           Data.Monoid
 import qualified Data.Set               as S
 import qualified Data.Text              as T
 import           Data.Validation
 import           Numeric.Natural
 import           TheGreatZimbabwe.Error
+
+newtype Merge k v = Merge { getMerge :: M.Map k v }
+  deriving (Show, Eq)
+
+instance (Ord k, Semigroup v) => Semigroup (Merge k v) where
+  Merge xs <> Merge ys = Merge $ M.unionWith (<>) xs ys
+
+instance (Ord k, Semigroup v) => Monoid (Merge k v) where
+  mempty = Merge (M.empty)
+  mappend = (<>)
 
 data Location = Location
   { locationX :: !Natural
@@ -165,28 +177,46 @@ makeLensesWith camelCaseFields ''PlayerId
 -- Little idea: this could be encoded as a Monoid and state changes could be
 -- encoded as mempty{ change }. could the whole game be done that way?
 data Player = Player
-  { playerInfo               :: PlayerInfo
+  { playerInfo               :: Alt Maybe PlayerInfo
   -- ^ Info about the human player
-  , playerVictoryRequirement :: Natural
+  , playerVictoryRequirement :: Sum Int
   -- ^ Player's current victory requirement
-  , playerVictoryPoints      :: Natural
+  , playerVictoryPoints      :: Sum Int
   -- ^ Player's current victory points
-  , playerEmpire             :: Maybe Empire
+  , playerEmpire             :: Alt Maybe Empire
   -- ^ The Empire the Player belongs to. Players have to choose this at the
   -- beginning of the game, so it's initially empty.
-  , playerCattle             :: Natural
+  , playerCattle             :: Sum Int
   -- ^ Number of cattle that a Player currently has. Start amount: 3
-  , playerMonuments          :: M.Map Location Natural
+  , playerMonuments          :: Merge Location (Sum Natural)
   -- ^ Locations of player-owned monuments on the map, along with monument height
   , playerCraftsmen          :: M.Map Location Craftsman
   -- ^ Locations of player-owned craftsmen on the map (each individual owned square)
-  , playerTechnologyCards    :: M.Map TechnologyCard Natural
-  -- ^ Player-owned technology cards, along with the price other players must pay to use them
+  , playerTechnologyCards    :: Merge TechnologyCard (Sum Int)
+  -- ^ Player-owned technology cards, along with the price other players must
+  -- pay to use them
   , playerSpecialists        :: S.Set Specialist
   -- ^ Player-owned specialist cards
-  , playerGod                :: Maybe God
+  , playerGod                :: Alt Maybe God
   -- ^ God a player adores
   }
+
+instance Semigroup Player where
+  p1 <> p2 = Player
+    { playerInfo = on (<>) playerInfo p1 p2
+    , playerVictoryRequirement = on (<>) playerVictoryRequirement p1 p2
+    , playerVictoryPoints = on (<>) playerVictoryPoints p1 p2
+    , playerEmpire = on (<>) playerEmpire p1 p2
+    , playerCattle = on (<>) playerCattle p1 p2
+    , playerMonuments = on (<>) playerMonuments p1 p2
+    , playerCraftsmen = on (<>) playerCraftsmen p1 p2
+    , playerTechnologyCards = on (<>) playerTechnologyCards p1 p2
+    , playerSpecialists = on (<>) playerSpecialists p1 p2
+    , playerGod = on (<>) playerGod p1 p2
+    }
+
+instance Monoid Player where
+  mempty = Player mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
 
 makeLensesWith camelCaseFields ''Player
 
@@ -208,7 +238,8 @@ data GenerosityOfKingsState = GenerosityOfKingsState
 makeLensesWith camelCaseFields ''GenerosityOfKingsState
 
 data Phase
-  = Setup
+  = PreSetup
+  | Setup
   | GenerosityOfKings
   | ReligionAndCulture
   | Revenues

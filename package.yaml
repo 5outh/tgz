@@ -20,6 +20,9 @@ dependencies:
   - linear
   - random-shuffle
   - MonadRandom
+  - persistent
+  - persistent-postgresql
+  - persistent-template
 
 library:
   source-dirs: library

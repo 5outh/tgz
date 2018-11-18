@@ -11,7 +11,8 @@ import           Prelude                    hiding (round)
 import           Control.Lens
 import           Control.Monad
 import qualified Data.Map.Strict            as M
-import           Data.Maybe                 (isJust)
+import           Data.Maybe
+import           Data.Monoid
 import qualified Data.Set                   as S
 import qualified Data.Text                  as T
 import           Data.Validation
@@ -21,10 +22,25 @@ import           TheGreatZimbabwe.MapLayout
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
 
+-- Pre-Setup
+
+chooseEmpire :: Empire -> PlayerId -> Game -> PlayerAction 'PreSetup
+chooseEmpire empire' playerId game = PlayerAction $ do
+  let chosenEmpires =
+        mapMaybe (getAlt . playerEmpire) $ M.elems $ game ^. players
+      setEmpire = mempty { playerEmpire = Alt (Just empire') }
+
+  (empire' `elem` chosenEmpires)
+    `impliesInvalid` "Empire has already been chosen."
+
+  pure $ game & over (players . at playerId) (fmap (mappend setEmpire))
+
 -- * Setup
 
 placeStartingMonument :: Location -> PlayerId -> Game -> PlayerAction 'Setup
 placeStartingMonument = undefined
+  -- must not be a monument at the location
+  -- must be a starting location
 
 -- * Generosity of Kings Phase
 
@@ -59,7 +75,7 @@ bid amount playerId game = PlayerAction $ do
 
   let notEnoughCattle =
         "You do not have enough cattle (need " <> tshow amount <> ")."
-  (player ^. cattle < amount) `impliesInvalid` notEnoughCattle
+  (player ^. cattle < fromIntegral amount) `impliesInvalid` notEnoughCattle
 
   (amount < minimumBid)
     `impliesInvalid` ("You must bid " <> tshow minimumBid <> " cattle or more.")
@@ -75,12 +91,11 @@ bid amount playerId game = PlayerAction $ do
   modifyGenerosityOfKings :: GenerosityOfKingsState -> GenerosityOfKingsState
   modifyGenerosityOfKings gok = gok & cattlePool +~ amount
 
-  modifyPlayer :: Player -> Player
-  modifyPlayer = cattle -~ amount
+  modifiedPlayer = mempty { playerCattle = Sum (negate $ fromIntegral amount) }
 
   modifyGame :: Game -> Game
   modifyGame =
-    over (players . at playerId) (fmap modifyPlayer)
+    over (players . at playerId) (fmap (mappend modifiedPlayer))
       . over (round . generosityOfKingsState) modifyGenerosityOfKings
 
 pass :: PlayerId -> Game -> PlayerAction 'GenerosityOfKings
