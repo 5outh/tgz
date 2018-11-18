@@ -46,7 +46,7 @@ newGame players = GameEvent <$> do
               , generosityOfKingsStateLastBid       = Last Nothing
               , generosityOfKingsStatePlayersPassed = []
               }
-            , roundCurrentPhase           = Setup
+            , roundCurrentPhase           = Last (Just Setup)
             }
           gameCraftsmen = newGameCraftsmen
           gameWinner    = Alt Nothing

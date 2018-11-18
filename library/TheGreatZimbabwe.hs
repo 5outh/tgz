@@ -66,7 +66,7 @@ bid :: Natural -> PlayerId -> Game -> PlayerAction 'GenerosityOfKings
 bid amount playerId game = PlayerAction $ do
   isPlayersTurn playerId game
 
-  (game ^. round . currentPhase /= GenerosityOfKings)
+  (game ^. round . currentPhase . to getLast /= Just GenerosityOfKings)
     `impliesInvalid` "You can only take the bid action in the Generosity of Kings phase"
 
   (playerId `elem` game ^. playersPassedLens)

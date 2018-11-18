@@ -282,7 +282,7 @@ data Round = Round
   -- ^ Used marker locations on the map
   , roundGenerosityOfKingsState :: GenerosityOfKingsState
   -- ^ State used in the Generosity of kings phase
-  , roundCurrentPhase           :: Phase
+  , roundCurrentPhase           :: Last Phase
   }
 
 makeLensesWith camelCaseFields ''Round
