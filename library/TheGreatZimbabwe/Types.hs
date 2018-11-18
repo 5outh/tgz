@@ -294,7 +294,7 @@ data Game = Game
   -- ^ Players of the game, in unordered format.
   , gameRound     :: Round
   -- ^ Current Round state
-  , gameMapLayout :: MapLayout
+  , gameMapLayout :: First MapLayout
   -- ^ Layout of the MapLayout
   , gameCraftsmen :: Merge Craftsman (S.Set TechnologyCard)
   -- ^ Remaining Craftsmen of each type

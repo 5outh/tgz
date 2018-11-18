@@ -25,8 +25,8 @@ newGame players = GameEvent <$> do
     n ->
       pure . internalError $ "Unsupported number of players (" <> tshow n <> ")"
   case eMapLayout of
-    Left  err           -> pure (Left err)
-    Right gameMapLayout -> do
+    Left  err       -> pure (Left err)
+    Right mapLayout -> do
       playerOrder <- shuffleM $ map fst players
       let newPlayer playerInfo' = mempty { playerInfo = Alt (Just playerInfo')
                                          , playerVictoryRequirement = Sum 20
@@ -50,6 +50,7 @@ newGame players = GameEvent <$> do
             }
           gameCraftsmen = newGameCraftsmen
           gameWinner    = Alt Nothing
+          gameMapLayout = First (Just mapLayout)
       pure $ Right Game {..}
 
 newGameCraftsmen :: Merge Craftsman (S.Set TechnologyCard)
