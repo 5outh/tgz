@@ -27,7 +27,7 @@ import           TheGreatZimbabwe.Types
 chooseEmpire :: Empire -> PlayerId -> Game -> PlayerAction 'PreSetup
 chooseEmpire empire' playerId game = PlayerAction $ do
   let chosenEmpires =
-        mapMaybe (getAlt . playerEmpire) $ M.elems $ game ^. players
+        mapMaybe (getAlt . playerEmpire) $ M.elems $ getMerge $ game ^. players
       setEmpire = mempty { playerEmpire = Alt (Just empire') }
 
   (empire' `elem` chosenEmpires)
@@ -50,10 +50,11 @@ impliesInvalid :: Bool -> T.Text -> Either GameError ()
 predicate `impliesInvalid` err = when predicate $ invalidAction err
 
 getPlayer :: PlayerId -> Game -> Either GameError Player
-getPlayer playerId game = case M.lookup playerId (game ^. players) of
-  Nothing ->
-    invalidAction $ "Player with id " <> tshow playerId <> " does not exist."
-  Just player -> pure player
+getPlayer playerId game =
+  case M.lookup playerId (getMerge $ game ^. players) of
+    Nothing ->
+      invalidAction $ "Player with id " <> tshow playerId <> " does not exist."
+    Just player -> pure player
 
 isPlayersTurn :: PlayerId -> Game -> Either GameError ()
 isPlayersTurn playerId game = when (game ^. round . currentPlayer /= playerId)
@@ -225,7 +226,7 @@ playRound :: Monad m => Game -> m Game
 playRound = undefined
 
 gameLoop game = do
-  if (isJust $ gameWinner game)
+  if (isJust $ getAlt $ gameWinner game)
     then announceWinner game
     else do
       nextGame <- playRound game

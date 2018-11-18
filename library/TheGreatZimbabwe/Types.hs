@@ -1,4 +1,6 @@
 {-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE DerivingStrategies     #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE KindSignatures         #-}
@@ -6,6 +8,7 @@
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeFamilies           #-}
 
 module TheGreatZimbabwe.Types where
 
@@ -18,11 +21,22 @@ import           Data.Monoid
 import qualified Data.Set               as S
 import qualified Data.Text              as T
 import           Data.Validation
+import           GHC.Generics
 import           Numeric.Natural
 import           TheGreatZimbabwe.Error
 
 newtype Merge k v = Merge { getMerge :: M.Map k v }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+type instance Index (Merge k v) = k
+type instance IxValue (Merge k v) = v
+instance Ord k => Ixed (Merge k v) where
+  ix k f m = Merge <$> ix k f (getMerge m)
+  {-# INLINE ix #-}
+
+instance Ord k => At (Merge k v) where
+  at k f m = Merge <$> at k f (getMerge m)
+  {-# INLINE at #-}
 
 instance (Ord k, Semigroup v) => Semigroup (Merge k v) where
   Merge xs <> Merge ys = Merge $ M.unionWith (<>) xs ys
@@ -253,7 +267,7 @@ data Round = Round
   -- (b) by the generosity of kings phase in other phases.
   , roundCurrentPlayer          :: PlayerId
   -- ^ The current player of the round
-  , roundUsedMarkers            :: M.Map Location UsedMarker
+  , roundUsedMarkers            :: Merge Location (Last UsedMarker)
   -- ^ Used marker locations on the map
   , roundGenerosityOfKingsState :: GenerosityOfKingsState
   -- ^ State used in the Generosity of kings phase
@@ -265,15 +279,15 @@ makeLensesWith camelCaseFields ''Round
 -- Note: unlimited cattle stock
 
 data Game = Game
-  { gamePlayers   :: M.Map PlayerId Player
+  { gamePlayers   :: Merge PlayerId Player
   -- ^ Players of the game, in unordered format.
   , gameRound     :: Round
   -- ^ Current Round state
   , gameMapLayout :: MapLayout
   -- ^ Layout of the MapLayout
-  , gameCraftsmen :: M.Map Craftsman [TechnologyCard]
+  , gameCraftsmen :: Merge Craftsman (S.Set TechnologyCard)
   -- ^ Remaining Craftsmen of each type
-  , gameWinner    :: Maybe PlayerId
+  , gameWinner    :: Alt Maybe PlayerId
   }
 
 makeLensesWith camelCaseFields ''Game
