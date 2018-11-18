@@ -24,16 +24,20 @@ import           TheGreatZimbabwe.Types
 
 -- Pre-Setup
 
+withPlayer :: PlayerId -> Player -> Game
+withPlayer playerId player =
+  mempty { gamePlayers = Merge (M.singleton playerId player) }
+
 chooseEmpire :: Empire -> PlayerId -> Game -> PlayerAction 'PreSetup
 chooseEmpire empire' playerId game = PlayerAction $ do
   let chosenEmpires =
         mapMaybe (getAlt . playerEmpire) $ M.elems $ getMerge $ game ^. players
-      setEmpire = mempty { playerEmpire = Alt (Just empire') }
+      withEmpire = mempty { playerEmpire = Alt (Just empire') }
 
   (empire' `elem` chosenEmpires)
     `impliesInvalid` "Empire has already been chosen."
 
-  pure $ game & over (players . at playerId) (fmap (mappend setEmpire))
+  pure $ game <> withPlayer playerId withEmpire
 
 -- * Setup
 
@@ -82,7 +86,10 @@ bid amount playerId game = PlayerAction $ do
   (amount < minimumBid)
     `impliesInvalid` ("You must bid " <> tshow minimumBid <> " cattle or more.")
 
-  pure $ modifyGame game
+  pure
+    $  game
+    <> withPlayer playerId modifiedPlayer
+    <> (mempty & round . generosityOfKingsState .~ modifiedGenerosityOfKings)
  where
   playersPassedLens :: Lens' Game [PlayerId]
   playersPassedLens = round . generosityOfKingsState . playersPassed
@@ -91,16 +98,11 @@ bid amount playerId game = PlayerAction $ do
   minimumBid =
     maybe 0 succ $ getLast (game ^. round . generosityOfKingsState . lastBid)
 
-  modifyGenerosityOfKings :: GenerosityOfKingsState -> GenerosityOfKingsState
-  modifyGenerosityOfKings gok =
-    gok <> mempty { generosityOfKingsStateCattlePool = Sum (-amount) }
+  modifiedGenerosityOfKings :: GenerosityOfKingsState
+  modifiedGenerosityOfKings =
+    mempty { generosityOfKingsStateCattlePool = Sum (-amount) }
 
   modifiedPlayer = mempty { playerCattle = Sum (negate $ fromIntegral amount) }
-
-  modifyGame :: Game -> Game
-  modifyGame =
-    over (players . at playerId) (fmap (mappend modifiedPlayer))
-      . over (round . generosityOfKingsState) modifyGenerosityOfKings
 
 pass :: PlayerId -> Game -> PlayerAction 'GenerosityOfKings
 pass playerId game = PlayerAction $ do

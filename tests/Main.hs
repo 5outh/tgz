@@ -69,16 +69,15 @@ shouldFailWith thing message = case thing of
   Left  err -> err `shouldBe` InvalidAction message
   Right _   -> error "Got 'Right', expected 'Left'"
 
-emptyGame = Game
-  { gamePlayers   = M.fromList [(PlayerId 1, p1), (PlayerId 2, p2)]
-  , gameRound     = Round [PlayerId 1, PlayerId 2]
-                          (PlayerId 1)
-                          M.empty
-                          (GenerosityOfKingsState [Kilwa, Zulu] 0 0 [])
-                          GenerosityOfKings
-  , gameMapLayout = MapLayout M.empty
-  , gameCraftsmen = M.empty
-  , gameWinner    = Nothing
+emptyGame = mempty
+  { gamePlayers   = Merge $ M.fromList [(PlayerId 1, p1), (PlayerId 2, p2)]
+  , gameRound     = Round
+    [PlayerId 1, PlayerId 2]
+    (Last (Just (PlayerId 1)))
+    (Merge M.empty)
+    (GenerosityOfKingsState [Kilwa, Zulu] 0 (Last (Just 0)) [])
+    (Last (Just GenerosityOfKings))
+  , gameMapLayout = First (Just (MapLayout M.empty))
   }
 
 p1 :: Player
