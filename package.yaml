@@ -24,6 +24,11 @@ dependencies:
   - persistent-postgresql
   - persistent-template
   - safe
+  - time
+  - bytestring
+  - aeson
+  - scotty
+  - http-types
 
 library:
   source-dirs: library

@@ -5,17 +5,18 @@
 module TheGreatZimbabwe.NewGame where
 
 import           Data.Bifunctor
-import qualified Data.Map.Strict            as M
+import qualified Data.Map.Strict                as M
 import           Data.Monoid
-import qualified Data.Set                   as S
-import           Safe                       (headMay)
+import qualified Data.Set                       as S
+import           Safe                           (headMay)
 import           System.Random.Shuffle
+import           TheGreatZimbabwe.Database.User (UserId (..))
 import           TheGreatZimbabwe.Error
-import qualified TheGreatZimbabwe.MapLayout as MapLayout
+import qualified TheGreatZimbabwe.MapLayout     as MapLayout
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
 
-newGame :: [(PlayerId, PlayerInfo)] -> IO (GameEvent 'Setup)
+newGame :: [(UserId, PlayerInfo)] -> IO (GameEvent 'Setup)
 newGame players = GameEvent <$> do
   -- probably want 'EitherT' here
   eMapLayout <- case (length players) of

@@ -1,5 +1,6 @@
 module Main where
 
+import qualified TheGreatZimbabwe.Api as Api
+
 main :: IO ()
-main = do
-  putStrLn "hello world"
+main = Api.main

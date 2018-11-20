@@ -7,6 +7,8 @@
 {-# LANGUAGE LambdaCase             #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE RankNTypes             #-}
+{-# LANGUAGE RecordWildCards        #-}
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE TypeFamilies           #-}
 
@@ -14,15 +16,21 @@ module TheGreatZimbabwe.Types where
 
 import           Control.Lens
 import           Control.Lens.TH
-import           Data.Function          (on)
-import qualified Data.Map.Strict        as M
-import           Data.Maybe             (isJust)
+import           Data.Aeson
+import qualified Data.Aeson                     as Aeson
+import           Data.Function                  (on)
+import           Data.List
+import qualified Data.Map.Strict                as M
+import           Data.Maybe                     (isJust)
 import           Data.Monoid
-import qualified Data.Set               as S
-import qualified Data.Text              as T
+import qualified Data.Set                       as S
+import qualified Data.Text                      as T
 import           Data.Validation
+import           Database.Persist               (Entity (..))
 import           GHC.Generics
 import           Numeric.Natural
+import           Prelude                        hiding (round)
+import           TheGreatZimbabwe.Database.User
 import           TheGreatZimbabwe.Error
 
 newtype Merge k v = Merge { getMerge :: M.Map k v }
@@ -48,7 +56,14 @@ instance (Ord k, Semigroup v) => Monoid (Merge k v) where
 data Location = Location
   { locationX :: !Natural
   , locationY :: !Char
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic)
+
+instance ToJSON Location where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON Location where
+  parseJSON = genericParseJSON defaultOptions
 
 makeLensesWith camelCaseFields ''Location
 
@@ -63,6 +78,10 @@ data PlayerInfo = PlayerInfo
   -- ^ A Player's unique email address
   }
 
+toPlayerInfoWithId :: Entity User -> (UserId, PlayerInfo)
+toPlayerInfoWithId (Entity playerId (User {..})) =
+  (playerId, PlayerInfo (Username userUsername) userEmail)
+
 makeLensesWith camelCaseFields ''PlayerInfo
 
 data Empire
@@ -71,7 +90,14 @@ data Empire
   | Zulu -- Green
   | Lozi -- Black
   | Mapungubwe -- White
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance ToJSON Empire where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON Empire where
+  parseJSON = genericParseJSON defaultOptions
 
 data Resource = Clay | Wood | Ivory | Diamonds
   deriving (Show, Eq)
@@ -182,12 +208,6 @@ godVR = \case
   TsuiGoab   -> 3
   Xango      -> (-2)
 
--- Player owns their locations on the board. Map is just the layout.
-
-newtype PlayerId = PlayerId { playerIdPlayerId :: Natural } deriving (Show, Eq, Ord)
-
-makeLensesWith camelCaseFields ''PlayerId
-
 -- Little idea: this could be encoded as a Monoid and state changes could be
 -- encoded as mempty{ change }. could the whole game be done that way?
 data Player = Player
@@ -245,7 +265,7 @@ data GenerosityOfKingsState = GenerosityOfKingsState
   -- is enough to reconstruct the view)
   , generosityOfKingsStateLastBid       :: Last Natural
   -- ^ The last bid made; next bid must be higher (or pass)
-  , generosityOfKingsStatePlayersPassed :: [PlayerId]
+  , generosityOfKingsStatePlayersPassed :: [UserId]
   -- ^ Which players have passed, in what order?
   }
 
@@ -269,20 +289,21 @@ data Phase
   | ReligionAndCulture
   | Revenues
   | LetUsCompareMythologies
-    deriving (Eq)
+    deriving (Show, Eq)
 
 data Round = Round
-  { roundPlayers                :: [PlayerId]
+  { roundPlayers                :: [UserId]
   -- ^ Ordered list representing the order of play, determined by
   -- (a) VR in the generosity of kings phase, and
   -- (b) by the generosity of kings phase in other phases.
-  , roundCurrentPlayer          :: Last PlayerId
+  , roundCurrentPlayer          :: Last UserId
   -- ^ The current player of the round
   , roundUsedMarkers            :: Merge Location (Last UsedMarker)
   -- ^ Used marker locations on the map
   , roundGenerosityOfKingsState :: GenerosityOfKingsState
   -- ^ State used in the Generosity of kings phase
   , roundCurrentPhase           :: Last Phase
+  -- Current phase of the round
   }
 
 instance Semigroup Round where
@@ -302,15 +323,15 @@ makeLensesWith camelCaseFields ''Round
 -- Note: unlimited cattle stock
 
 data Game = Game
-  { gamePlayers   :: Merge PlayerId Player
+  { gamePlayers   :: Merge UserId Player
   -- ^ Players of the game, in unordered format.
   , gameRound     :: Round
   -- ^ Current Round state
   , gameMapLayout :: First MapLayout
-  -- ^ Layout of the MapLayout
+  -- ^ Layout of the Map
   , gameCraftsmen :: Merge Craftsman (S.Set TechnologyCard)
   -- ^ Remaining Craftsmen of each type
-  , gameWinner    :: Alt Maybe PlayerId
+  , gameWinner    :: Alt Maybe UserId
   }
 
 instance Semigroup Game where
