@@ -10,15 +10,17 @@
 {-# LANGUAGE TypeFamilies               #-}
 
 module TheGreatZimbabwe.Database.Game where
-import           Control.Monad.IO.Class      (liftIO)
+
+import           Control.Monad.IO.Class          (liftIO)
+import           Data.Text                       (Text)
 import           Database.Persist
 import           Database.Persist.Postgresql
 import           Database.Persist.TH
-
-import           Data.Text                   (Text)
+import           TheGreatZimbabwe.Database.JSONB
+import           TheGreatZimbabwe.Types          as Types
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
   Game json
     name         Text
-    initialState Text
+    initialState (JSONB Types.Game)
 |]

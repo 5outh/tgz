@@ -38,6 +38,7 @@ main = do
       post "/new-game" $ do
         userIds :: [UserId] <- map (toSqlKey . fromIntegral)
           <$> param @[Int] "userIds"
+        name  <- param "name"
         users <- runDB pool $ selectList [UserId <-. userIds] []
         let playerInfos = map toPlayerInfoWithId users
         eGameData <- getGameEvent <$> liftIO (newGame playerInfos)
@@ -48,10 +49,9 @@ main = do
             InternalError err ->
               status internalServerError500 *> json gameError
           Right gameData -> do
-            --mSavedGameData <- runDB pool $ do
-              --key <- insert gameData
-              --P.getEntity key
-            mSavedGameData <- pure (Just ())
+            mSavedGameData <- runDB pool $ do
+              key <- insert (Game name gameData)
+              P.getEntity key
             case mSavedGameData of
               Nothing            -> status internalServerError500 *> json ()
               Just savedGameData -> json savedGameData
