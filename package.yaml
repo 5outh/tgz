@@ -13,22 +13,27 @@ extra-source-files:
 
 dependencies:
   - base >= 4.7 && < 5
-  - text
+  - aeson
+  - bytestring
   - containers
-  - validation
+  - http-types
   - lens
   - linear
-  - random-shuffle
   - MonadRandom
+  - mtl
   - persistent
   - persistent-postgresql
   - persistent-template
+  - random-shuffle
   - safe
-  - time
-  - bytestring
-  - aeson
   - scotty
-  - http-types
+  - text
+  - time
+  - validation
+  - resource-pool
+  - monad-logger
+  - monad-control
+  - wai
 
 library:
   source-dirs: library
