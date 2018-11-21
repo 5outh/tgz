@@ -1,14 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 module TheGreatZimbabwe.Validation where
 
-import           Prelude                        hiding (round)
+import           Prelude                hiding (round)
 
 import           Control.Lens
-import           Control.Monad                  (when)
-import           Data.Maybe                     (fromMaybe)
+import           Control.Monad          (when)
 import           Data.Monoid
-import qualified Data.Text                      as T
-import           TheGreatZimbabwe.Database.User (UserId (..))
+import qualified Data.Text              as T
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types

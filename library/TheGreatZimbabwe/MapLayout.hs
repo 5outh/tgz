@@ -3,12 +3,9 @@
 module TheGreatZimbabwe.MapLayout where
 
 import           Control.Monad.Random   (uniform)
-import           Data.Char
 import           Data.Foldable
-import           Data.List
 import qualified Data.Map.Strict        as M
 import           Data.Maybe
-import           System.IO
 import           System.Random.Shuffle
 import           TheGreatZimbabwe.Tile
 import           TheGreatZimbabwe.Types
@@ -34,17 +31,31 @@ data Tiles9 = Tiles9
   , tiles9Tile8 :: Maybe Tile
   , tiles9Tile9 :: Maybe Tile
   }
-
+q1Locations :: [Location]
 q1Locations = flip Location <$> ['a' .. 'f'] <*> [1 .. 6]
+
+q2Locations :: [Location]
 q2Locations = flip Location <$> ['a' .. 'f'] <*> [7 .. 12]
+
+q3Locations :: [Location]
 q3Locations = flip Location <$> ['a' .. 'f'] <*> [13 .. 18]
 
+q4Locations :: [Location]
 q4Locations = flip Location <$> ['g' .. 'l'] <*> [1 .. 6]
+
+q5Locations :: [Location]
 q5Locations = flip Location <$> ['g' .. 'l'] <*> [7 .. 12]
+
+q6Locations :: [Location]
 q6Locations = flip Location <$> ['g' .. 'l'] <*> [13 .. 18]
 
+q7Locations :: [Location]
 q7Locations = flip Location <$> ['m' .. 'r'] <*> [1 .. 6]
+
+q8Locations :: [Location]
 q8Locations = flip Location <$> ['m' .. 'r'] <*> [7 .. 12]
+
+q9Locations :: [Location]
 q9Locations = flip Location <$> ['m' .. 'r'] <*> [13 .. 18]
 
 fromTiles9 :: Tiles9 -> MapLayout
@@ -60,7 +71,6 @@ fromTiles9 Tiles9 {..} = MapLayout $ M.fromList $ concat
   , tileLayout q9Locations tiles9Tile9
   ]
  where
-  emptyTile = replicate 36 Nothing
   tileLayout :: [Location] -> Maybe Tile -> [(Location, Square)]
   tileLayout locations mTile = catMaybes $ case mTile of
     Nothing   -> []
@@ -80,10 +90,10 @@ printMapLayout (MapLayout layout) = do
   let xs = [1 .. 18]
       ys = ['a' .. 'r']
 
-  for_ ys $ \y -> do
-    let str = flip concatMap xs $ \x ->
+  for_ ys $ \y' -> do
+    let str = flip concatMap xs $ \x' ->
           let loc = "" -- y : show x <> ": "
-              chr = case M.lookup (Location x y) layout of
+              chr = case M.lookup (Location x' y') layout of
                 Nothing -> ' '
                 Just c  -> case c of
                   Water     -> 'O'

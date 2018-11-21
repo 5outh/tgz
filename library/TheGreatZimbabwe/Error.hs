@@ -2,7 +2,6 @@
 module TheGreatZimbabwe.Error where
 
 import           Data.Aeson
-import qualified Data.Aeson   as Aeson
 import qualified Data.Text    as T
 import           GHC.Generics
 

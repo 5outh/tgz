@@ -12,12 +12,10 @@
 
 module TheGreatZimbabwe.Database.User where
 
-import           Control.Monad.IO.Class         (liftIO)
-import           Data.Text                      (Text)
+import           Data.Text                   (Text)
 import           Database.Persist
 import           Database.Persist.Postgresql
 import           Database.Persist.TH
-import           TheGreatZimbabwe.Database.Game
 import           TheGreatZimbabwe.Types
 
 -- TODO add password

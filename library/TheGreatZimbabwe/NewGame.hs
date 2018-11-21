@@ -5,21 +5,21 @@
 module TheGreatZimbabwe.NewGame where
 
 import           Data.Bifunctor
-import qualified Data.Map.Strict                as M
+import qualified Data.Map.Strict            as M
+import           Data.Map.Strict.Merge
 import           Data.Monoid
-import qualified Data.Set                       as S
-import           Safe                           (headMay)
+import qualified Data.Set                   as S
+import           Safe                       (headMay)
 import           System.Random.Shuffle
-import           TheGreatZimbabwe.Database.User (UserId (..))
 import           TheGreatZimbabwe.Error
-import qualified TheGreatZimbabwe.MapLayout     as MapLayout
+import qualified TheGreatZimbabwe.MapLayout as MapLayout
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
 
 newGame :: [(PlayerId, PlayerInfo)] -> IO (GameEvent 'Setup)
-newGame players = GameEvent <$> do
+newGame playerList = GameEvent <$> do
   -- probably want 'EitherT' here
-  eMapLayout <- case (length players) of
+  eMapLayout <- case (length playerList) of
     2 -> Right <$> MapLayout.twoPlayers
     3 -> Right <$> MapLayout.threePlayers
     4 -> Right <$> MapLayout.fourPlayers
@@ -27,9 +27,9 @@ newGame players = GameEvent <$> do
     n ->
       pure . internalError $ "Unsupported number of players (" <> tshow n <> ")"
   case eMapLayout of
-    Left  err       -> pure (Left err)
-    Right mapLayout -> do
-      playerOrder <- shuffleM $ map fst players
+    Left  err    -> pure (Left err)
+    Right layout -> do
+      playerOrder <- shuffleM $ map fst playerList
       let newPlayer playerInfo' = mempty { playerInfo = Alt (Just playerInfo')
                                          , playerVictoryRequirement = Sum 20
                                          , playerVictoryPoints = Sum 0
@@ -37,7 +37,7 @@ newGame players = GameEvent <$> do
                                          , playerCattle = Sum 3
                                          , playerGod = Alt Nothing
                                          }
-          gamePlayers = Merge $ M.fromList $ map (second newPlayer) players
+          gamePlayers = Merge $ M.fromList $ map (second newPlayer) playerList
           gameRound   = Round
             { roundPlayers                = playerOrder
             , roundCurrentPlayer          = Last (headMay playerOrder)
@@ -52,7 +52,7 @@ newGame players = GameEvent <$> do
             }
           gameCraftsmen = newGameCraftsmen
           gameWinner    = Alt Nothing
-          gameMapLayout = First (Just mapLayout)
+          gameMapLayout = First (Just layout)
       pure $ Right Game {..}
 
 newGameCraftsmen :: Merge Craftsman (S.Set TechnologyCard)
@@ -61,6 +61,9 @@ newGameCraftsmen = Merge $ M.fromList
   , IvoryCarver .: ivoryCarvers
   , WoodCarver .: woodCarvers
   , DiamondCutter .: diamondCutters
+  , VesselMaker .: vesselMakers
+  , ThroneMaker .: throneMakers
+  , Sculptor .: sculptors
   ]
  where
   (.:)    = (,)

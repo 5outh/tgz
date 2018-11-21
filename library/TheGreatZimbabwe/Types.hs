@@ -16,50 +16,19 @@
 
 module TheGreatZimbabwe.Types where
 
+import           Data.Map.Strict.Merge
 import           Control.Lens
-import           Control.Lens.TH
 import           Data.Aeson
-import qualified Data.Aeson             as Aeson
-import           Data.Function          (on)
-import           Data.List
-import qualified Data.Map.Strict        as M
-import           Data.Maybe             (isJust)
+import           Data.Function                            ( on )
+import qualified Data.Map.Strict               as M
 import           Data.Monoid
-import qualified Data.Set               as S
-import qualified Data.Text              as T
-import           Data.Validation
-import           Database.Persist       (Entity (..))
+import qualified Data.Set                      as S
+import qualified Data.Text                     as T
 import           GHC.Generics
 import           Numeric.Natural
-import           Prelude                hiding (round)
+import           Prelude                           hiding ( round )
 import           TheGreatZimbabwe.Error
-
--- Orphans :X
-deriving newtype instance FromJSON a => FromJSON (Alt Maybe a)
-deriving newtype instance ToJSON a => ToJSON (Alt Maybe a)
-deriving newtype instance FromJSON a => FromJSON (Sum a)
-deriving newtype instance ToJSON a => ToJSON (Sum a)
-
-newtype Merge k v = Merge { getMerge :: M.Map k v }
-  deriving stock (Show, Eq, Generic)
-  deriving newtype (ToJSON, FromJSON)
-
-type instance Index (Merge k v) = k
-type instance IxValue (Merge k v) = v
-instance Ord k => Ixed (Merge k v) where
-  ix k f m = Merge <$> ix k f (getMerge m)
-  {-# INLINE ix #-}
-
-instance Ord k => At (Merge k v) where
-  at k f m = Merge <$> at k f (getMerge m)
-  {-# INLINE at #-}
-
-instance (Ord k, Semigroup v) => Semigroup (Merge k v) where
-  Merge xs <> Merge ys = Merge $ M.unionWith (<>) xs ys
-
-instance (Ord k, Semigroup v) => Monoid (Merge k v) where
-  mempty = Merge (M.empty)
-  mappend = (<>)
+import           TheGreatZimbabwe.Orphans                 ( )
 
 newtype PlayerId = PlayerId { getPlayerId :: Integer }
   deriving stock (Eq, Ord, Show)

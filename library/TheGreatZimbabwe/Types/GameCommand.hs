@@ -2,15 +2,12 @@
 module TheGreatZimbabwe.Types.GameCommand where
 
 import           Data.Aeson
-import qualified Data.Aeson                     as Aeson
 import           GHC.Generics
-import           TheGreatZimbabwe.Database.User (UserId (..))
--- TODO: This heirarchy is weird, should fix it
 import           TheGreatZimbabwe.Types
 
 data GameCommand
-  = ChooseEmpire Empire UserId
-  | PlaceStartingMonument Location UserId
+  = ChooseEmpire Empire PlayerId
+  | PlaceStartingMonument Location PlayerId
   deriving Generic
 
 instance ToJSON GameCommand where

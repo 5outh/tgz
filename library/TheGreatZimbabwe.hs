@@ -4,6 +4,8 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# OPTIONS_GHC -fno-warn-unused-local-binds    #-}
+
 module TheGreatZimbabwe where
 
 import           Prelude                     hiding (round)
@@ -12,14 +14,11 @@ import           Control.Lens
 import           Control.Monad
 import           Data.List
 import qualified Data.Map.Strict             as M
+import           Data.Map.Strict.Merge
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Set                    as S
-import qualified Data.Text                   as T
-import           Data.Validation
 import           Numeric.Natural
 import           TheGreatZimbabwe.Error
-import           TheGreatZimbabwe.MapLayout
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
 import           TheGreatZimbabwe.Validation
@@ -33,8 +32,7 @@ cyclePlayers game = do
     Just player ->
       pure
         $  game
-        <> ( mempty & round .~ mempty { roundCurrentPlayer = Last (Just player)
-                                      }
+        <> (mempty & round .~ mempty { roundCurrentPlayer = Last (Just player) }
            )
     Nothing -> newRound game
  where
@@ -44,13 +42,13 @@ cyclePlayers game = do
   nextPlayer = case (getLast $ game ^. round . currentPlayer) of
     Nothing       -> internalError "Could not find current player."
     Just playerId -> case elemIndex playerId players' of
-      Nothing    -> internalError "Current player was not found in game."
-      Just index -> if index < length players' - 1
-        then Right (Just $ players' !! index)
+      Nothing -> internalError "Current player was not found in game."
+      Just i  -> if i < length players' - 1
+        then Right (Just $ players' !! i)
         else Right Nothing -- signals end of turn
 
 newRound :: Game -> Either GameError Game
-newRound game = internalError "cannot start a new round yet"
+newRound _ = internalError "cannot start a new round yet"
 
 -- * Pre-Setup
 
@@ -197,11 +195,6 @@ chooseSpecialist = undefined
 useSpecialist
   :: Specialist -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 useSpecialist = undefined
- where
-  use Shaman       = undefined
-  use RainCeremony = undefined
-  use Nomads       = undefined
-  use (Builder _)  = undefined
 
 buildMonument
   :: Location -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
@@ -272,10 +265,3 @@ announceWinner = undefined
 
 playRound :: Monad m => Game -> m Game
 playRound = undefined
-
-gameLoop game = do
-  if (isJust $ getAlt $ gameWinner game)
-    then announceWinner game
-    else do
-      nextGame <- playRound game
-      gameLoop game

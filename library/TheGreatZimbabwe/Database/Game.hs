@@ -11,9 +11,7 @@
 
 module TheGreatZimbabwe.Database.Game where
 
-import           Control.Monad.IO.Class          (liftIO)
 import           Data.Text                       (Text)
-import           Database.Persist
 import           Database.Persist.Postgresql
 import           Database.Persist.TH
 import           TheGreatZimbabwe.Database.JSONB

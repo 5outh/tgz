@@ -1,4 +1,10 @@
-module TheGreatZimbabwe.Tile where
+module TheGreatZimbabwe.Tile
+  ( allTiles
+  , startingTile
+  , rotate90
+  , Tile(..)
+  )
+where
 
 
 import           Data.List              (transpose)
@@ -141,8 +147,10 @@ rotate90 (Tile squares) = Tile $ reverse (transpose squares)
 data Row a = Row !a !a !a !a !a !a
 
 fromRow :: Row a -> [a]
-fromRow (Row a b c d e f) = [a, b, c, d, e, f]
+fromRow (Row a b c' d' e' f) = [a, b, c', d', e', f]
 
+
+o, e, s, w, d, i, c :: Square
 o = Water
 e = Land BlankLand
 s = Land StartingArea
