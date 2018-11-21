@@ -17,7 +17,7 @@ import           Database.Persist
 import           Database.Persist.Postgresql
 import           Database.Persist.TH
 import           TheGreatZimbabwe.Database.JSONB
-import           TheGreatZimbabwe.Types          as Types
+import qualified TheGreatZimbabwe.Types          as Types
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
   Game json

@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE StandaloneDeriving              #-}
 {-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE DerivingStrategies     #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -11,30 +12,37 @@
 {-# LANGUAGE RecordWildCards        #-}
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module TheGreatZimbabwe.Types where
 
 import           Control.Lens
 import           Control.Lens.TH
 import           Data.Aeson
-import qualified Data.Aeson                     as Aeson
-import           Data.Function                  (on)
+import qualified Data.Aeson             as Aeson
+import           Data.Function          (on)
 import           Data.List
-import qualified Data.Map.Strict                as M
-import           Data.Maybe                     (isJust)
+import qualified Data.Map.Strict        as M
+import           Data.Maybe             (isJust)
 import           Data.Monoid
-import qualified Data.Set                       as S
-import qualified Data.Text                      as T
+import qualified Data.Set               as S
+import qualified Data.Text              as T
 import           Data.Validation
-import           Database.Persist               (Entity (..))
+import           Database.Persist       (Entity (..))
 import           GHC.Generics
 import           Numeric.Natural
-import           Prelude                        hiding (round)
-import           TheGreatZimbabwe.Database.User
+import           Prelude                hiding (round)
 import           TheGreatZimbabwe.Error
 
+-- Orphans :X
+deriving newtype instance FromJSON a => FromJSON (Alt Maybe a)
+deriving newtype instance ToJSON a => ToJSON (Alt Maybe a)
+deriving newtype instance FromJSON a => FromJSON (Sum a)
+deriving newtype instance ToJSON a => ToJSON (Sum a)
+
 newtype Merge k v = Merge { getMerge :: M.Map k v }
-  deriving (Show, Eq, Generic)
+  deriving stock (Show, Eq, Generic)
+  deriving newtype (ToJSON, FromJSON)
 
 type instance Index (Merge k v) = k
 type instance IxValue (Merge k v) = v
@@ -53,6 +61,10 @@ instance (Ord k, Semigroup v) => Monoid (Merge k v) where
   mempty = Merge (M.empty)
   mappend = (<>)
 
+newtype PlayerId = PlayerId { getPlayerId :: Integer }
+  deriving stock (Eq, Ord, Show)
+  deriving newtype (FromJSON, ToJSON, FromJSONKey, ToJSONKey)
+
 data Location = Location
   { locationX :: !Natural
   , locationY :: !Char
@@ -62,12 +74,19 @@ instance ToJSON Location where
   toJSON = genericToJSON defaultOptions
   toEncoding = genericToEncoding defaultOptions
 
+instance ToJSONKey Location where
+  toJSONKey = ToJSONKeyValue toJSON toEncoding
+
 instance FromJSON Location where
   parseJSON = genericParseJSON defaultOptions
+
+instance FromJSONKey Location where
+  fromJSONKey = FromJSONKeyValue parseJSON
 
 makeLensesWith camelCaseFields ''Location
 
 newtype Username = Username { usernameUsername :: T.Text }
+  deriving newtype (ToJSON, FromJSON)
 
 makeLensesWith camelCaseFields ''Username
 
@@ -76,11 +95,14 @@ data PlayerInfo = PlayerInfo
   -- ^ A Player's unique username
   , playerInfoEmail    :: T.Text
   -- ^ A Player's unique email address
-  }
+  } deriving (Generic)
 
-toPlayerInfoWithId :: Entity User -> (UserId, PlayerInfo)
-toPlayerInfoWithId (Entity playerId (User {..})) =
-  (playerId, PlayerInfo (Username userUsername) userEmail)
+instance FromJSON PlayerInfo where
+  parseJSON = genericParseJSON defaultOptions
+
+instance ToJSON PlayerInfo where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 
 makeLensesWith camelCaseFields ''PlayerInfo
 
@@ -100,21 +122,43 @@ instance FromJSON Empire where
   parseJSON = genericParseJSON defaultOptions
 
 data Resource = Clay | Wood | Ivory | Diamonds
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance ToJSON Resource where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON Resource where
+  parseJSON = genericParseJSON defaultOptions
 
 data Land
   = StartingArea
   | Resource Resource
   | BlankLand
-    deriving (Show, Eq)
+    deriving (Show, Eq, Generic)
+
+instance ToJSON Land where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON Land where
+  parseJSON = genericParseJSON defaultOptions
 
 data Square =
     Water
   | Land Land
-    deriving (Show, Eq)
+    deriving (Show, Eq, Generic)
+
+instance ToJSON Square where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON Square where
+  parseJSON = genericParseJSON defaultOptions
 
 newtype MapLayout = MapLayout { mapLayoutMapLayout :: M.Map Location Square }
-  deriving (Show, Eq)
+  deriving stock (Show, Eq)
+  deriving newtype (ToJSON, FromJSON)
 
 makeLensesWith camelCaseFields ''MapLayout
 
@@ -128,7 +172,20 @@ data Craftsman
   | VesselMaker
   | ThroneMaker
   | Sculptor
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Generic)
+
+instance FromJSONKey Craftsman where
+  fromJSONKey = FromJSONKeyValue parseJSON
+
+instance ToJSONKey Craftsman where
+  toJSONKey = ToJSONKeyValue toJSON toEncoding
+
+instance FromJSON Craftsman where
+  parseJSON = genericParseJSON defaultOptions
+
+instance ToJSON Craftsman where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 
 data PrimaryOrSecondary = Primary | Secondary
 
@@ -138,7 +195,20 @@ data TechnologyCard = TechnologyCard
   , technologyCardVictoryRequirement :: Natural
   , technologyCardVictoryPoints      :: Natural
   , technologyCardCost               :: Natural
-  } deriving (Eq, Ord)
+  } deriving (Eq, Ord, Generic)
+
+instance FromJSON TechnologyCard where
+  parseJSON = genericParseJSON defaultOptions
+
+instance ToJSON TechnologyCard where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSONKey TechnologyCard where
+  fromJSONKey = FromJSONKeyValue parseJSON
+
+instance ToJSONKey TechnologyCard where
+  toJSONKey = ToJSONKeyValue toJSON toEncoding
 
 makeLensesWith camelCaseFields ''TechnologyCard
 
@@ -156,7 +226,14 @@ data Specialist
   -- this card.
   | Nomads
   -- ^ Pay 2 cattle to ignore zoning restrictions when building a new monument
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Generic)
+
+instance FromJSON Specialist where
+  parseJSON = genericParseJSON defaultOptions
+
+instance ToJSON Specialist where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 
 specialistVR :: Specialist -> Natural
 specialistVR = \case
@@ -191,6 +268,14 @@ data God
   -- ^ Receives 2 additional cattle in each revenue phase
   | Xango
   -- ^ Victory Requirement - 2
+    deriving (Generic)
+
+instance FromJSON God where
+  parseJSON = genericParseJSON defaultOptions
+
+instance ToJSON God where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 
 -- Victory Requirement for a god
 godVR :: God -> Int
@@ -233,7 +318,14 @@ data Player = Player
   -- ^ Player-owned specialist cards
   , playerGod                :: Alt Maybe God
   -- ^ God a player adores
-  }
+  } deriving (Generic)
+
+instance FromJSON Player where
+  parseJSON = genericParseJSON defaultOptions
+
+instance ToJSON Player where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 
 instance Semigroup Player where
   p1 <> p2 = Player
@@ -256,6 +348,14 @@ makeLensesWith camelCaseFields ''Player
 
 -- Note: UsedTwice only occurs when Atete is in play.
 data UsedMarker = NotUsed | Used | UsedTwice
+  deriving (Generic)
+
+instance ToJSON UsedMarker where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON UsedMarker where
+  parseJSON = genericParseJSON defaultOptions
 
 data GenerosityOfKingsState = GenerosityOfKingsState
   { generosityOfKingsStatePlaques       :: [Empire]
@@ -265,9 +365,16 @@ data GenerosityOfKingsState = GenerosityOfKingsState
   -- is enough to reconstruct the view)
   , generosityOfKingsStateLastBid       :: Last Natural
   -- ^ The last bid made; next bid must be higher (or pass)
-  , generosityOfKingsStatePlayersPassed :: [UserId]
+  , generosityOfKingsStatePlayersPassed :: [PlayerId]
   -- ^ Which players have passed, in what order?
-  }
+  } deriving (Generic)
+
+instance ToJSON GenerosityOfKingsState where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON GenerosityOfKingsState where
+  parseJSON = genericParseJSON defaultOptions
 
 instance Semigroup GenerosityOfKingsState where
   g1 <> g2 = GenerosityOfKingsState
@@ -289,14 +396,21 @@ data Phase
   | ReligionAndCulture
   | Revenues
   | LetUsCompareMythologies
-    deriving (Show, Eq)
+    deriving (Show, Eq, Generic)
+
+instance ToJSON Phase where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON Phase where
+  parseJSON = genericParseJSON defaultOptions
 
 data Round = Round
-  { roundPlayers                :: [UserId]
+  { roundPlayers                :: [PlayerId]
   -- ^ Ordered list representing the order of play, determined by
   -- (a) VR in the generosity of kings phase, and
   -- (b) by the generosity of kings phase in other phases.
-  , roundCurrentPlayer          :: Last UserId
+  , roundCurrentPlayer          :: Last PlayerId
   -- ^ The current player of the round
   , roundUsedMarkers            :: Merge Location (Last UsedMarker)
   -- ^ Used marker locations on the map
@@ -304,7 +418,14 @@ data Round = Round
   -- ^ State used in the Generosity of kings phase
   , roundCurrentPhase           :: Last Phase
   -- Current phase of the round
-  }
+  } deriving (Generic)
+
+instance FromJSON Round where
+  parseJSON = genericParseJSON defaultOptions
+
+instance ToJSON Round where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
 
 instance Semigroup Round where
   r1 <> r2 = Round
@@ -323,7 +444,7 @@ makeLensesWith camelCaseFields ''Round
 -- Note: unlimited cattle stock
 
 data Game = Game
-  { gamePlayers   :: Merge UserId Player
+  { gamePlayers   :: Merge PlayerId Player
   -- ^ Players of the game, in unordered format.
   , gameRound     :: Round
   -- ^ Current Round state
@@ -331,8 +452,20 @@ data Game = Game
   -- ^ Layout of the Map
   , gameCraftsmen :: Merge Craftsman (S.Set TechnologyCard)
   -- ^ Remaining Craftsmen of each type
-  , gameWinner    :: Alt Maybe UserId
-  }
+  , gameWinner    :: Alt Maybe PlayerId
+  } deriving (Generic)
+
+instance ToJSON Game where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON Game where
+  parseJSON = withObject "Game" $ \o -> Game
+    <$> o .: "gamePlayers"
+    <*> o .: "gameRound"
+    <*> o .: "gameMapLayout"
+    <*> o .: "gameCraftsmen"
+    <*> (Alt <$> o .: "gameWinner")
 
 instance Semigroup Game where
   g1 <> g2 = Game

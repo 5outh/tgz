@@ -10,20 +10,22 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
-import           Data.Monoid                    (mconcat)
+import           Data.Monoid                     (mconcat)
 import           Data.Pool
-import qualified Data.Text                      as T
-import qualified Data.Text.Lazy                 as TL
+import qualified Data.Text                       as T
+import qualified Data.Text.Lazy                  as TL
 import           Database.Persist.Postgresql
-import qualified Database.Persist.Postgresql    as P
+import qualified Database.Persist.Postgresql     as P
 import           Network.HTTP.Types.Status
-import           Network.Wai                    (Response)
+import           Network.Wai                     (Response)
+import qualified TheGreatZimbabwe.Database.Game  as DB
+import           TheGreatZimbabwe.Database.JSONB
 import           TheGreatZimbabwe.Database.User
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.NewGame
 import           TheGreatZimbabwe.Types
 import           Web.Scotty
-import qualified Web.Scotty                     as Scotty
+import qualified Web.Scotty                      as Scotty
 
 devString :: ConnectionString
 devString = ""
@@ -50,7 +52,7 @@ main = do
               status internalServerError500 *> json gameError
           Right gameData -> do
             mSavedGameData <- runDB pool $ do
-              key <- insert (Game name gameData)
+              key <- insert (DB.Game name (JSONB gameData))
               P.getEntity key
             case mSavedGameData of
               Nothing            -> status internalServerError500 *> json ()

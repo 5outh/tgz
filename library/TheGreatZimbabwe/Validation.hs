@@ -24,7 +24,7 @@ phaseIs phase game =
                      )
   where currentPhase' = getLast $ game ^. round . currentPhase
 
-playerIs :: UserId -> Game -> Either GameError ()
+playerIs :: PlayerId -> Game -> Either GameError ()
 playerIs playerId game =
   (Just playerId /= current) `impliesInvalid` "It's not your turn."
   where current = game ^. round . currentPlayer . to getLast

@@ -16,7 +16,7 @@ import qualified TheGreatZimbabwe.MapLayout     as MapLayout
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
 
-newGame :: [(UserId, PlayerInfo)] -> IO (GameEvent 'Setup)
+newGame :: [(PlayerId, PlayerInfo)] -> IO (GameEvent 'Setup)
 newGame players = GameEvent <$> do
   -- probably want 'EitherT' here
   eMapLayout <- case (length players) of

@@ -6,19 +6,18 @@
 {-# LANGUAGE TypeApplications    #-}
 module TheGreatZimbabwe where
 
-import           Prelude                        hiding (round)
+import           Prelude                     hiding (round)
 
 import           Control.Lens
 import           Control.Monad
 import           Data.List
-import qualified Data.Map.Strict                as M
+import qualified Data.Map.Strict             as M
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Set                       as S
-import qualified Data.Text                      as T
+import qualified Data.Set                    as S
+import qualified Data.Text                   as T
 import           Data.Validation
 import           Numeric.Natural
-import           TheGreatZimbabwe.Database.User (UserId (..))
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.MapLayout
 import           TheGreatZimbabwe.Text
@@ -39,7 +38,7 @@ cyclePlayers game = do
            )
     Nothing -> newRound game
  where
-  players' :: [UserId]
+  players' :: [PlayerId]
   players'   = game ^. round . players
 
   nextPlayer = case (getLast $ game ^. round . currentPlayer) of
@@ -55,11 +54,11 @@ newRound game = internalError "cannot start a new round yet"
 
 -- * Pre-Setup
 
-withPlayer :: UserId -> Player -> Game
+withPlayer :: PlayerId -> Player -> Game
 withPlayer playerId player =
   mempty { gamePlayers = Merge (M.singleton playerId player) }
 
-chooseEmpire :: Empire -> UserId -> Game -> PlayerAction 'PreSetup
+chooseEmpire :: Empire -> PlayerId -> Game -> PlayerAction 'PreSetup
 chooseEmpire empire' playerId game = PlayerAction $ do
   let chosenEmpires =
         mapMaybe (getAlt . playerEmpire) $ M.elems $ getMerge $ game ^. players
@@ -73,9 +72,9 @@ chooseEmpire empire' playerId game = PlayerAction $ do
 
 -- * Setup
 
--- TODO: UserId should always match current player id
+-- TODO: PlayerId should always match current player id
 
-placeStartingMonument :: Location -> UserId -> Game -> PlayerAction 'Setup
+placeStartingMonument :: Location -> PlayerId -> Game -> PlayerAction 'Setup
 placeStartingMonument location playerId game = PlayerAction $ do
   phaseIs Setup game
   not isStartingMonument
@@ -97,21 +96,21 @@ placeStartingMonument location playerId game = PlayerAction $ do
 
 data GenerosityOfKingsAction = Bid Natural | Pass
 
-getPlayer :: UserId -> Game -> Either GameError Player
+getPlayer :: PlayerId -> Game -> Either GameError Player
 getPlayer playerId game =
   case M.lookup playerId (getMerge $ game ^. players) of
     Nothing ->
       invalidAction $ "Player with id " <> tshow playerId <> " does not exist."
     Just player -> pure player
 
-isPlayersTurn :: UserId -> Game -> Either GameError ()
+isPlayersTurn :: PlayerId -> Game -> Either GameError ()
 isPlayersTurn playerId game =
   when (game ^. round . currentPlayer . to getLast /= Just playerId)
     $ invalidAction "It is not your turn."
 
 -- TODO: How to cycle players in a foolproof way?
 
-bid :: Natural -> UserId -> Game -> PlayerAction 'GenerosityOfKings
+bid :: Natural -> PlayerId -> Game -> PlayerAction 'GenerosityOfKings
 bid amount playerId game = PlayerAction $ do
   isPlayersTurn playerId game
 
@@ -135,7 +134,7 @@ bid amount playerId game = PlayerAction $ do
     <> withPlayer playerId modifiedPlayer
     <> (mempty & round . generosityOfKingsState .~ modifiedGenerosityOfKings)
  where
-  playersPassedLens :: Lens' Game [UserId]
+  playersPassedLens :: Lens' Game [PlayerId]
   playersPassedLens = round . generosityOfKingsState . playersPassed
 
   minimumBid :: Natural
@@ -148,13 +147,13 @@ bid amount playerId game = PlayerAction $ do
 
   modifiedPlayer = mempty { playerCattle = Sum (negate $ fromIntegral amount) }
 
-pass :: UserId -> Game -> PlayerAction 'GenerosityOfKings
+pass :: PlayerId -> Game -> PlayerAction 'GenerosityOfKings
 pass playerId game = PlayerAction $ do
   (playerId `elem` game ^. playersPassedLens)
     `impliesInvalid` "You have already passed."
   pure $ game & playersPassedLens %~ (playerId :)
  where
-  playersPassedLens :: Lens' Game [UserId]
+  playersPassedLens :: Lens' Game [PlayerId]
   playersPassedLens = round . generosityOfKingsState . playersPassed
 
 clearSlate :: Game -> GameEvent 'GenerosityOfKings
@@ -188,15 +187,15 @@ data ReligionAndCultureCommand f = ReligionAndCultureCommand
   , religionAndCultureAction3 :: Maybe (ReligionAndCultureCommand3 f)
   }
 
-chooseGod :: God -> UserId -> Game -> PlayerAction 'ReligionAndCulture
+chooseGod :: God -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 chooseGod = undefined
 
 chooseSpecialist
-  :: Specialist -> UserId -> Game -> PlayerAction 'ReligionAndCulture
+  :: Specialist -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 chooseSpecialist = undefined
 
 useSpecialist
-  :: Specialist -> UserId -> Game -> PlayerAction 'ReligionAndCulture
+  :: Specialist -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 useSpecialist = undefined
  where
   use Shaman       = undefined
@@ -204,7 +203,8 @@ useSpecialist = undefined
   use Nomads       = undefined
   use (Builder _)  = undefined
 
-buildMonument :: Location -> UserId -> Game -> PlayerAction 'ReligionAndCulture
+buildMonument
+  :: Location -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 buildMonument = undefined
 
 -- TODO: Craftsmen have shapes, which must be validated. Location is top-left
@@ -212,7 +212,7 @@ buildMonument = undefined
 placeCraftsmen
   :: [(Location, Craftsman)]
   -- ^ Note: This can be empty just to trigger a 'raisePrices' command.
-  -> UserId
+  -> PlayerId
   -> Game
   -> PlayerAction 'ReligionAndCulture
 placeCraftsmen = undefined
@@ -226,7 +226,7 @@ raiseMonuments
   :: [(Location, [RaiseMonumentCommand])]
   -- ^ For each location user wants to raise, a sequence of commands done in
   -- order to raise it.
-  -> UserId
+  -> PlayerId
   -> Game
   -> PlayerAction 'ReligionAndCulture
 raiseMonuments = undefined
@@ -239,14 +239,14 @@ raiseMonuments = undefined
 
 -- Set the price of a technology card. Mandatory after choosing a new card.
 setPrice
-  :: TechnologyCard -> UserId -> Game -> PlayerAction 'ReligionAndCulture
+  :: TechnologyCard -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 setPrice = undefined
 
 -- Raise prices of a Player's technology cards. Available after taking the
 -- placeCraftsmen action.
 raisePrices
   :: [(TechnologyCard, Natural)]
-  -> UserId
+  -> PlayerId
   -> Game
   -> PlayerAction 'ReligionAndCulture
 raisePrices = undefined
