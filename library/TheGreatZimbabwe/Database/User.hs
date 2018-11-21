@@ -20,8 +20,10 @@ import           Database.Persist.TH
 import           TheGreatZimbabwe.Database.Game
 import           TheGreatZimbabwe.Types
 
+-- TODO add password
+
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
-  User json
+  User json sql=users
     username  Text
     email     Text
 |]

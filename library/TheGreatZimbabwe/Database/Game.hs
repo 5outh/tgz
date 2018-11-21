@@ -20,7 +20,7 @@ import           TheGreatZimbabwe.Database.JSONB
 import qualified TheGreatZimbabwe.Types          as Types
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
-  Game json
+  Game json sql=games
     name         Text
     initialState (JSONB Types.Game)
 |]

@@ -23,7 +23,7 @@ import           TheGreatZimbabwe.Database.User
 import           TheGreatZimbabwe.Types.GameCommand
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
-  Command json
+  Command json sql=commands
     gameId       GameId
     userId       UserId
     createdAt    UTCTime
