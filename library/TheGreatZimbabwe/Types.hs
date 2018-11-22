@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE StandaloneDeriving              #-}
+{-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE DerivingStrategies     #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -18,7 +18,7 @@ module TheGreatZimbabwe.Types where
 
 import           Data.Map.Strict.Merge
 import           Control.Lens
-import           Data.Aeson
+import           Data.Aeson                        hiding ( defaultOptions )
 import           Data.Function                            ( on )
 import qualified Data.Map.Strict               as M
 import           Data.Monoid
@@ -28,7 +28,9 @@ import           GHC.Generics
 import           Numeric.Natural
 import           Prelude                           hiding ( round )
 import           TheGreatZimbabwe.Error
+import           TheGreatZimbabwe.Aeson
 import           TheGreatZimbabwe.Orphans                 ( )
+import           Elm.Derive
 
 newtype PlayerId = PlayerId { getPlayerId :: Integer }
   deriving stock (Eq, Ord, Show)
@@ -39,24 +41,19 @@ data Location = Location
   , locationY :: !Char
   } deriving (Show, Eq, Ord, Generic)
 
-instance ToJSON Location where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
 instance ToJSONKey Location where
   toJSONKey = ToJSONKeyValue toJSON toEncoding
-
-instance FromJSON Location where
-  parseJSON = genericParseJSON defaultOptions
 
 instance FromJSONKey Location where
   fromJSONKey = FromJSONKeyValue parseJSON
 
+deriveBoth (unPrefix "location") ''Location
 makeLensesWith camelCaseFields ''Location
 
 newtype Username = Username { usernameUsername :: T.Text }
-  deriving newtype (ToJSON, FromJSON)
+  deriving (Generic)
 
+deriveBoth (unPrefix "username") ''Username
 makeLensesWith camelCaseFields ''Username
 
 data PlayerInfo = PlayerInfo
@@ -66,13 +63,7 @@ data PlayerInfo = PlayerInfo
   -- ^ A Player's unique email address
   } deriving (Generic)
 
-instance FromJSON PlayerInfo where
-  parseJSON = genericParseJSON defaultOptions
-
-instance ToJSON PlayerInfo where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
+deriveBoth (unPrefix "playerInfo") ''PlayerInfo
 makeLensesWith camelCaseFields ''PlayerInfo
 
 data Empire
@@ -83,22 +74,12 @@ data Empire
   | Mapungubwe -- White
   deriving (Show, Eq, Generic)
 
-instance ToJSON Empire where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON Empire where
-  parseJSON = genericParseJSON defaultOptions
+deriveBoth (unPrefix "empire") ''Empire
 
 data Resource = Clay | Wood | Ivory | Diamonds
   deriving (Show, Eq, Generic)
 
-instance ToJSON Resource where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON Resource where
-  parseJSON = genericParseJSON defaultOptions
+deriveBoth (unPrefix "resource") ''Resource
 
 data Land
   = StartingArea
@@ -106,29 +87,19 @@ data Land
   | BlankLand
     deriving (Show, Eq, Generic)
 
-instance ToJSON Land where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON Land where
-  parseJSON = genericParseJSON defaultOptions
+deriveBoth defaultOptions ''Land
 
 data Square =
     Water
   | Land Land
     deriving (Show, Eq, Generic)
 
-instance ToJSON Square where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON Square where
-  parseJSON = genericParseJSON defaultOptions
+deriveBoth defaultOptions ''Square
 
 newtype MapLayout = MapLayout { mapLayoutMapLayout :: M.Map Location Square }
   deriving stock (Show, Eq)
-  deriving newtype (ToJSON, FromJSON)
 
+deriveBoth (unPrefix "mapLayout") ''MapLayout
 makeLensesWith camelCaseFields ''MapLayout
 
 data Craftsman
@@ -149,14 +120,11 @@ instance FromJSONKey Craftsman where
 instance ToJSONKey Craftsman where
   toJSONKey = ToJSONKeyValue toJSON toEncoding
 
-instance FromJSON Craftsman where
-  parseJSON = genericParseJSON defaultOptions
-
-instance ToJSON Craftsman where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
+deriveBoth defaultOptions ''Craftsman
 
 data PrimaryOrSecondary = Primary | Secondary
+
+deriveBoth defaultOptions ''PrimaryOrSecondary
 
 data TechnologyCard = TechnologyCard
   { technologyCardName               :: T.Text
@@ -166,19 +134,13 @@ data TechnologyCard = TechnologyCard
   , technologyCardCost               :: Natural
   } deriving (Eq, Ord, Generic)
 
-instance FromJSON TechnologyCard where
-  parseJSON = genericParseJSON defaultOptions
-
-instance ToJSON TechnologyCard where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
 instance FromJSONKey TechnologyCard where
   fromJSONKey = FromJSONKeyValue parseJSON
 
 instance ToJSONKey TechnologyCard where
   toJSONKey = ToJSONKeyValue toJSON toEncoding
 
+deriveBoth (unPrefix "technologyCard") ''TechnologyCard
 makeLensesWith camelCaseFields ''TechnologyCard
 
 data Specialist
@@ -197,12 +159,7 @@ data Specialist
   -- ^ Pay 2 cattle to ignore zoning restrictions when building a new monument
     deriving (Eq, Ord, Generic)
 
-instance FromJSON Specialist where
-  parseJSON = genericParseJSON defaultOptions
-
-instance ToJSON Specialist where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
+deriveBoth defaultOptions ''Specialist
 
 specialistVR :: Specialist -> Natural
 specialistVR = \case
@@ -239,12 +196,7 @@ data God
   -- ^ Victory Requirement - 2
     deriving (Generic)
 
-instance FromJSON God where
-  parseJSON = genericParseJSON defaultOptions
-
-instance ToJSON God where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
+deriveBoth defaultOptions ''God
 
 -- Victory Requirement for a god
 godVR :: God -> Int
@@ -289,13 +241,6 @@ data Player = Player
   -- ^ God a player adores
   } deriving (Generic)
 
-instance FromJSON Player where
-  parseJSON = genericParseJSON defaultOptions
-
-instance ToJSON Player where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
 instance Semigroup Player where
   p1 <> p2 = Player
     { playerInfo = on (<>) playerInfo p1 p2
@@ -313,18 +258,14 @@ instance Semigroup Player where
 instance Monoid Player where
   mempty = Player mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
 
+deriveBoth (unPrefix "player") ''Player
 makeLensesWith camelCaseFields ''Player
 
 -- Note: UsedTwice only occurs when Atete is in play.
 data UsedMarker = NotUsed | Used | UsedTwice
   deriving (Generic)
 
-instance ToJSON UsedMarker where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON UsedMarker where
-  parseJSON = genericParseJSON defaultOptions
+deriveBoth defaultOptions ''UsedMarker
 
 data GenerosityOfKingsState = GenerosityOfKingsState
   { generosityOfKingsStatePlaques       :: [Empire]
@@ -338,13 +279,6 @@ data GenerosityOfKingsState = GenerosityOfKingsState
   -- ^ Which players have passed, in what order?
   } deriving (Generic)
 
-instance ToJSON GenerosityOfKingsState where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON GenerosityOfKingsState where
-  parseJSON = genericParseJSON defaultOptions
-
 instance Semigroup GenerosityOfKingsState where
   g1 <> g2 = GenerosityOfKingsState
     { generosityOfKingsStatePlaques = on (<>) generosityOfKingsStatePlaques g1 g2
@@ -356,6 +290,7 @@ instance Semigroup GenerosityOfKingsState where
 instance Monoid GenerosityOfKingsState where
   mempty = GenerosityOfKingsState mempty mempty mempty mempty
 
+deriveBoth (unPrefix "generosityOfKingsState") ''GenerosityOfKingsState
 makeLensesWith camelCaseFields ''GenerosityOfKingsState
 
 data Phase
@@ -367,12 +302,7 @@ data Phase
   | LetUsCompareMythologies
     deriving (Show, Eq, Generic)
 
-instance ToJSON Phase where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON Phase where
-  parseJSON = genericParseJSON defaultOptions
+deriveBoth defaultOptions ''Phase
 
 data Round = Round
   { roundPlayers                :: [PlayerId]
@@ -389,13 +319,6 @@ data Round = Round
   -- Current phase of the round
   } deriving (Generic)
 
-instance FromJSON Round where
-  parseJSON = genericParseJSON defaultOptions
-
-instance ToJSON Round where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
 instance Semigroup Round where
   r1 <> r2 = Round
     { roundPlayers = on (<>) roundPlayers r1 r2
@@ -408,6 +331,7 @@ instance Semigroup Round where
 instance Monoid Round where
   mempty = Round mempty mempty mempty mempty mempty
 
+deriveBoth (unPrefix "round") ''Round
 makeLensesWith camelCaseFields ''Round
 
 -- Note: unlimited cattle stock
@@ -424,18 +348,6 @@ data Game = Game
   , gameWinner    :: Alt Maybe PlayerId
   } deriving (Generic)
 
-instance ToJSON Game where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON Game where
-  parseJSON = withObject "Game" $ \o -> Game
-    <$> o .: "gamePlayers"
-    <*> o .: "gameRound"
-    <*> o .: "gameMapLayout"
-    <*> o .: "gameCraftsmen"
-    <*> (Alt <$> o .: "gameWinner")
-
 instance Semigroup Game where
   g1 <> g2 = Game
     { gamePlayers = on (<>) gamePlayers g1 g2
@@ -448,6 +360,7 @@ instance Semigroup Game where
 instance Monoid Game where
   mempty = Game mempty mempty mempty mempty mempty
 
+deriveBoth (unPrefix "game") ''Game
 makeLensesWith camelCaseFields ''Game
 
 -- | Resource a craftsman requires

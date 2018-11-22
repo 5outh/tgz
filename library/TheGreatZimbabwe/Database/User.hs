@@ -16,12 +16,13 @@ import           Data.Text                   (Text)
 import           Database.Persist
 import           Database.Persist.Postgresql
 import           Database.Persist.TH
+import           TheGreatZimbabwe.Aeson
 import           TheGreatZimbabwe.Types
 
 -- TODO add password
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
-  User json sql=users
+  User sql=users
     username  Text
     email     Text
 |]

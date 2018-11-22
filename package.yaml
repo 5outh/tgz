@@ -34,6 +34,7 @@ dependencies:
   - monad-logger
   - monad-control
   - wai
+  - elm-bridge
 
 library:
   source-dirs: library
@@ -44,6 +45,12 @@ executables:
       - tgz
     source-dirs:      src
     main:             Main.hs
+  generate-elm-datatypes:
+    dependencies:
+      - tgz
+      - elm-bridge
+    source-dirs: generate-elm-datatypes
+    main: Main.hs
 
 tests:
   test:

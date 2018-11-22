@@ -1,7 +1,9 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE TemplateHaskell #-}
 module TheGreatZimbabwe.Types.GameCommand where
 
-import           Data.Aeson
+import           Data.Aeson             hiding (defaultOptions)
+import           Elm.Derive
 import           GHC.Generics
 import           TheGreatZimbabwe.Types
 
@@ -10,9 +12,4 @@ data GameCommand
   | PlaceStartingMonument Location PlayerId
   deriving Generic
 
-instance ToJSON GameCommand where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON GameCommand where
-  parseJSON = genericParseJSON defaultOptions
+deriveBoth defaultOptions ''GameCommand

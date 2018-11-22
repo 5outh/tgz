@@ -1,8 +1,10 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE TemplateHaskell #-}
 module TheGreatZimbabwe.Error where
 
-import           Data.Aeson
+import           Data.Aeson   hiding (defaultOptions)
 import qualified Data.Text    as T
+import           Elm.Derive
 import           GHC.Generics
 
 data GameError
@@ -10,15 +12,11 @@ data GameError
   | InternalError T.Text
   deriving (Show, Eq, Generic)
 
+deriveBoth defaultOptions ''GameError
+
 invalidAction :: T.Text -> Either GameError a
 invalidAction = Left . InvalidAction
 
 internalError :: T.Text -> Either GameError a
 internalError = Left . InternalError
 
-instance ToJSON GameError where
-  toJSON = genericToJSON defaultOptions
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON GameError where
-  parseJSON = genericParseJSON defaultOptions

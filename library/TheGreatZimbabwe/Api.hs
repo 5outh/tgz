@@ -45,7 +45,7 @@ routes pool = do
     mGame <- runDB pool $ selectFirst [persistIdField ==. gameId] []
     case mGame of
       Nothing   -> status notFound404 *> json ()
-      Just game -> status ok200 *> json game
+      Just game -> status ok200 *> json (Game.toView game)
 
   Scotty.post "/new-game" $ do
     userIds :: [User.UserId] <- map (toSqlKey . fromIntegral)
@@ -65,7 +65,7 @@ routes pool = do
           P.getEntity key
         case mSavedGameData of
           Nothing            -> status internalServerError500 *> json ()
-          Just savedGameData -> json savedGameData
+          Just savedGameData -> json (Game.toView savedGameData)
 
 runDB
   :: (MonadIO m, MonadBaseControl IO m)

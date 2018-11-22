@@ -6,6 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 module TheGreatZimbabwe.Database.JSONB where
@@ -17,6 +18,7 @@ import qualified Data.Text.Encoding   as TE
 import           Data.Time            ()
 import           Database.Persist
 import           Database.Persist.Sql
+import           Elm.Derive
 import           GHC.Generics
 
 newtype JSONB a = JSONB { unJSONB :: a }
