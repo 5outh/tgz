@@ -499,21 +499,21 @@ jsonEncGame  val =
 type alias GameView  =
    { id: Int
    , name: String
-   , initial_state: Game
+   , state: Game
    }
 
 jsonDecGameView : Json.Decode.Decoder ( GameView )
 jsonDecGameView =
-   Json.Decode.succeed (\pid pname pinitial_state -> {id = pid, name = pname, initial_state = pinitial_state})
+   Json.Decode.succeed (\pid pname pstate -> {id = pid, name = pname, state = pstate})
    |> required "id" (Json.Decode.int)
    |> required "name" (Json.Decode.string)
-   |> required "initial_state" (jsonDecGame)
+   |> required "state" (jsonDecGame)
 
 jsonEncGameView : GameView -> Value
 jsonEncGameView  val =
    Json.Encode.object
    [ ("id", Json.Encode.int val.id)
    , ("name", Json.Encode.string val.name)
-   , ("initial_state", jsonEncGame val.initial_state)
+   , ("state", jsonEncGame val.state)
    ]
 
