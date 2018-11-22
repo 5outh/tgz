@@ -30,12 +30,12 @@ newGame playerList = GameEvent <$> do
     Left  err    -> pure (Left err)
     Right layout -> do
       playerOrder <- shuffleM $ map fst playerList
-      let newPlayer playerInfo' = mempty { playerInfo = Alt (Just playerInfo')
+      let newPlayer playerInfo' = mempty { playerInfo = Just playerInfo'
                                          , playerVictoryRequirement = Sum 20
-                                         , playerVictoryPoints = Sum 0
-                                         , playerEmpire = Alt Nothing
-                                         , playerCattle = Sum 3
-                                         , playerGod = Alt Nothing
+                                         , playerVictoryPoints      = Sum 0
+                                         , playerEmpire             = Nothing
+                                         , playerCattle             = Sum 3
+                                         , playerGod                = Nothing
                                          }
           gamePlayers = Merge $ M.fromList $ map (second newPlayer) playerList
           gameRound   = Round
@@ -51,7 +51,7 @@ newGame playerList = GameEvent <$> do
             , roundCurrentPhase           = Last (Just Setup)
             }
           gameCraftsmen = newGameCraftsmen
-          gameWinner    = Alt Nothing
+          gameWinner    = Nothing
           gameMapLayout = First (Just layout)
       pure $ Right Game {..}
 

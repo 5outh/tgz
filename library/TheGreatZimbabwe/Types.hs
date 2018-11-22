@@ -218,13 +218,13 @@ godVR = \case
 -- Little idea: this could be encoded as a Monoid and state changes could be
 -- encoded as mempty{ change }. could the whole game be done that way?
 data Player = Player
-  { playerInfo               :: Alt Maybe PlayerInfo
+  { playerInfo               :: Maybe PlayerInfo
   -- ^ Info about the human player
   , playerVictoryRequirement :: Sum Int
   -- ^ Player's current victory requirement
   , playerVictoryPoints      :: Sum Int
   -- ^ Player's current victory points
-  , playerEmpire             :: Alt Maybe Empire
+  , playerEmpire             :: Maybe Empire
   -- ^ The Empire the Player belongs to. Players have to choose this at the
   -- beginning of the game, so it's initially empty.
   , playerCattle             :: Sum Int
@@ -238,37 +238,37 @@ data Player = Player
   -- pay to use them
   , playerSpecialists        :: S.Set Specialist
   -- ^ Player-owned specialist cards
-  , playerGod                :: Alt Maybe God
+  , playerGod                :: Maybe God
   -- ^ God a player adores
   } deriving (Generic)
 
 instance Semigroup Player where
   p1 <> p2 = Player
-    { playerInfo = on (<>) playerInfo p1 p2
+    { playerInfo = on (<|>) playerInfo p1 p2
     --- ^ TODO: This may not be needed
     , playerVictoryRequirement = on (<>) playerVictoryRequirement p1 p2
     , playerVictoryPoints = on (<>) playerVictoryPoints p1 p2
-    , playerEmpire = on (<>) playerEmpire p1 p2
+    , playerEmpire = on (<|>) playerEmpire p1 p2
     , playerCattle = on (<>) playerCattle p1 p2
     , playerMonuments = on (<>) playerMonuments p1 p2
     , playerCraftsmen = on (<>) playerCraftsmen p1 p2
     , playerTechnologyCards = on (<>) playerTechnologyCards p1 p2
     , playerSpecialists = on (<>) playerSpecialists p1 p2
-    , playerGod = on (<>) playerGod p1 p2
+    , playerGod = on (<|>) playerGod p1 p2
     }
 
 instance Monoid Player where
   mempty = Player
-    { playerInfo = mempty
+    { playerInfo = Nothing
     , playerVictoryRequirement = mempty
     , playerVictoryPoints = mempty
-    , playerEmpire = mempty
+    , playerEmpire = Nothing
     , playerCattle = mempty
     , playerMonuments = mempty
     , playerCraftsmen = mempty
     , playerTechnologyCards = mempty
     , playerSpecialists = mempty
-    , playerGod = mempty
+    , playerGod = Nothing
     }
 
 deriveBoth (unPrefix "player") ''Player
@@ -358,7 +358,7 @@ data Game = Game
   -- ^ Layout of the Map
   , gameCraftsmen :: Merge Craftsman (S.Set TechnologyCard)
   -- ^ Remaining Craftsmen of each type
-  , gameWinner    :: Alt Maybe PlayerId
+  , gameWinner    :: Maybe PlayerId
   } deriving (Generic)
 
 instance Semigroup Game where
@@ -367,11 +367,11 @@ instance Semigroup Game where
     , gameRound = on (<>) gameRound g1 g2
     , gameMapLayout = on (<>) gameMapLayout g1 g2
     , gameCraftsmen = on (<>) gameCraftsmen g1 g2
-    , gameWinner = on (<>) gameWinner g1 g2
+    , gameWinner = on (<|>) gameWinner g1 g2
     }
 
 instance Monoid Game where
-  mempty = Game mempty mempty mempty mempty mempty
+  mempty = Game mempty mempty mempty mempty Nothing
 
 deriveBoth (unPrefix "game") ''Game
 makeLensesWith camelCaseFields ''Game

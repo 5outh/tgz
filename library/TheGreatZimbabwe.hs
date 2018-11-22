@@ -59,8 +59,8 @@ withPlayer playerId player =
 chooseEmpire :: Empire -> PlayerId -> Game -> PlayerAction 'PreSetup
 chooseEmpire empire' playerId game = PlayerAction $ do
   let chosenEmpires =
-        mapMaybe (getAlt . playerEmpire) $ M.elems $ getMerge $ game ^. players
-      withEmpire = mempty { playerEmpire = Alt (Just empire') }
+        mapMaybe playerEmpire $ M.elems $ getMerge $ game ^. players
+      withEmpire = mempty { playerEmpire = Just empire' }
 
   phaseIs PreSetup game
   (empire' `elem` chosenEmpires)
