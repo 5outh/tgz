@@ -3,32 +3,41 @@ module Main exposing (..)
 import Browser
 import Html exposing (Html, text, div, h1, img)
 import Html.Attributes exposing (src)
-import ApiTypes
-
+import Http
+import ApiTypes exposing (GameView, jsonDecGameView)
 
 ---- MODEL ----
 
 
 type alias Model =
-    {}
+    { game : Fetch Http.Error GameView }
 
+
+getGame =
+  Http.get
+    "http://localhost:8000/game/2"
+    jsonDecGameView
 
 init : ( Model, Cmd Msg )
 init =
-    ( {}, Cmd.none )
+    ( { game = Loading },
+      Http.send GotGame getGame
+    )
 
 
 
 ---- UPDATE ----
 
+type Fetch err a = Failure err | Loading | Success a
 
 type Msg
-    = NoOp
-
+    = GotGame (Result Http.Error GameView)
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    ( model, Cmd.none )
+update msg model = case msg of
+    GotGame result -> case result of
+        Err err -> ({model| game = Failure (Debug.log "error!" err)}, Cmd.none)
+        Ok gameView -> ({model| game = Success gameView}, Cmd.none)
 
 
 

@@ -36,11 +36,12 @@ api = do
       runMigration Command.migrateAll
       runMigration Game.migrateAll
 
-    liftIO $ scotty 3000 (routes pool)
+    liftIO $ scotty 8000 (routes pool)
 
 routes :: ConnectionPool -> ScottyM ()
 routes pool = do
   Scotty.get "/game/:id" $ do
+    addHeader "Access-Control-Allow-Origin" "*"
     gameId :: Game.GameId <- toSqlKey <$> param @Int64 "id"
     mGame <- runDB pool $ selectFirst [persistIdField ==. gameId] []
     case mGame of
@@ -48,6 +49,7 @@ routes pool = do
       Just game -> status ok200 *> json (Game.toView game)
 
   Scotty.post "/new-game" $ do
+    addHeader "Access-Control-Allow-Origin" "*"
     userIds :: [User.UserId] <- map (toSqlKey . fromIntegral)
       <$> param @[Int] "userIds"
     gameName <- param "name"
