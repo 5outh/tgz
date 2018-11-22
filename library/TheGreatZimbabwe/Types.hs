@@ -16,6 +16,7 @@
 
 module TheGreatZimbabwe.Types where
 
+import           Control.Applicative
 import           Data.Map.Strict.Merge
 import           Control.Lens
 import           Data.Aeson                        hiding ( defaultOptions )
@@ -244,6 +245,7 @@ data Player = Player
 instance Semigroup Player where
   p1 <> p2 = Player
     { playerInfo = on (<>) playerInfo p1 p2
+    --- ^ TODO: This may not be needed
     , playerVictoryRequirement = on (<>) playerVictoryRequirement p1 p2
     , playerVictoryPoints = on (<>) playerVictoryPoints p1 p2
     , playerEmpire = on (<>) playerEmpire p1 p2
@@ -256,7 +258,18 @@ instance Semigroup Player where
     }
 
 instance Monoid Player where
-  mempty = Player mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
+  mempty = Player
+    { playerInfo = mempty
+    , playerVictoryRequirement = mempty
+    , playerVictoryPoints = mempty
+    , playerEmpire = mempty
+    , playerCattle = mempty
+    , playerMonuments = mempty
+    , playerCraftsmen = mempty
+    , playerTechnologyCards = mempty
+    , playerSpecialists = mempty
+    , playerGod = mempty
+    }
 
 deriveBoth (unPrefix "player") ''Player
 makeLensesWith camelCaseFields ''Player
