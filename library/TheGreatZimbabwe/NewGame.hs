@@ -31,32 +31,32 @@ newGame playerList = GameEvent <$> do
     Right layout -> do
       playerOrder <- shuffleM $ map fst playerList
       let newPlayer playerInfo' = mempty { playerInfo = Just playerInfo'
-                                         , playerVictoryRequirement = Sum 20
-                                         , playerVictoryPoints      = Sum 0
+                                         , playerVictoryRequirement = 20
+                                         , playerVictoryPoints      = 0
                                          , playerEmpire             = Nothing
-                                         , playerCattle             = Sum 3
+                                         , playerCattle             = 3
                                          , playerGod                = Nothing
                                          }
-          gamePlayers = Merge $ M.fromList $ map (second newPlayer) playerList
+          gamePlayers = M.fromList $ map (second newPlayer) playerList
           gameRound   = Round
             { roundPlayers                = playerOrder
-            , roundCurrentPlayer          = Last (headMay playerOrder)
+            , roundCurrentPlayer          = headMay playerOrder
             , roundUsedMarkers            = mempty
             , roundGenerosityOfKingsState = GenerosityOfKingsState
               { generosityOfKingsStatePlaques       = [] -- Nothing yet, I don't love this
-              , generosityOfKingsStateCattlePool    = Sum 0
-              , generosityOfKingsStateLastBid       = Last Nothing
+              , generosityOfKingsStateCattlePool    = 0
+              , generosityOfKingsStateLastBid       = Nothing
               , generosityOfKingsStatePlayersPassed = []
               }
-            , roundCurrentPhase           = Last (Just Setup)
+            , roundCurrentPhase           = Just Setup
             }
           gameCraftsmen = newGameCraftsmen
           gameWinner    = Nothing
-          gameMapLayout = First (Just layout)
+          gameMapLayout = Just layout
       pure $ Right Game {..}
 
-newGameCraftsmen :: Merge Craftsman (S.Set TechnologyCard)
-newGameCraftsmen = Merge $ M.fromList
+newGameCraftsmen :: M.Map Craftsman (S.Set TechnologyCard)
+newGameCraftsmen = M.fromList
   [ Potter .: potters
   , IvoryCarver .: ivoryCarvers
   , WoodCarver .: woodCarvers

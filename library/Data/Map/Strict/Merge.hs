@@ -29,6 +29,7 @@ newtype Merge k v = Merge { getMerge :: M.Map k v }
 
 type instance Index (Merge k v) = k
 type instance IxValue (Merge k v) = v
+
 instance Ord k => Ixed (Merge k v) where
   ix k f m = Merge <$> ix k f (getMerge m)
   {-# INLINE ix #-}
@@ -37,9 +38,9 @@ instance Ord k => At (Merge k v) where
   at k f m = Merge <$> at k f (getMerge m)
   {-# INLINE at #-}
 
-instance (Ord k, Semigroup v) => Semigroup (Merge k v) where
-  Merge xs <> Merge ys = Merge $ M.unionWith (<>) xs ys
+instance (Ord k, Num v) => Semigroup (Merge k v) where
+  Merge xs <> Merge ys = Merge $ M.unionWith (+) xs ys
 
-instance (Ord k, Semigroup v) => Monoid (Merge k v) where
+instance (Ord k, Num v) => Monoid (Merge k v) where
   mempty = Merge (M.empty)
   mappend = (<>)

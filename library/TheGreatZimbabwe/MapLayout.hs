@@ -6,6 +6,7 @@ import           Control.Monad.Random   (uniform)
 import           Data.Foldable
 import qualified Data.Map.Strict        as M
 import           Data.Maybe
+import           GHC.Natural            (Natural)
 import           System.Random.Shuffle
 import           TheGreatZimbabwe.Tile
 import           TheGreatZimbabwe.Types
@@ -31,32 +32,36 @@ data Tiles9 = Tiles9
   , tiles9Tile8 :: Maybe Tile
   , tiles9Tile9 :: Maybe Tile
   }
+
+mkLocation :: Char -> Natural -> Location
+mkLocation c n = Location n (pure c)
+
 q1Locations :: [Location]
-q1Locations = flip Location <$> ['a' .. 'f'] <*> [1 .. 6]
+q1Locations = mkLocation <$> ['a' .. 'f'] <*> [1 .. 6]
 
 q2Locations :: [Location]
-q2Locations = flip Location <$> ['a' .. 'f'] <*> [7 .. 12]
+q2Locations = mkLocation <$> ['a' .. 'f'] <*> [7 .. 12]
 
 q3Locations :: [Location]
-q3Locations = flip Location <$> ['a' .. 'f'] <*> [13 .. 18]
+q3Locations = mkLocation <$> ['a' .. 'f'] <*> [13 .. 18]
 
 q4Locations :: [Location]
-q4Locations = flip Location <$> ['g' .. 'l'] <*> [1 .. 6]
+q4Locations = mkLocation <$> ['g' .. 'l'] <*> [1 .. 6]
 
 q5Locations :: [Location]
-q5Locations = flip Location <$> ['g' .. 'l'] <*> [7 .. 12]
+q5Locations = mkLocation <$> ['g' .. 'l'] <*> [7 .. 12]
 
 q6Locations :: [Location]
-q6Locations = flip Location <$> ['g' .. 'l'] <*> [13 .. 18]
+q6Locations = mkLocation <$> ['g' .. 'l'] <*> [13 .. 18]
 
 q7Locations :: [Location]
-q7Locations = flip Location <$> ['m' .. 'r'] <*> [1 .. 6]
+q7Locations = mkLocation <$> ['m' .. 'r'] <*> [1 .. 6]
 
 q8Locations :: [Location]
-q8Locations = flip Location <$> ['m' .. 'r'] <*> [7 .. 12]
+q8Locations = mkLocation <$> ['m' .. 'r'] <*> [7 .. 12]
 
 q9Locations :: [Location]
-q9Locations = flip Location <$> ['m' .. 'r'] <*> [13 .. 18]
+q9Locations = mkLocation <$> ['m' .. 'r'] <*> [13 .. 18]
 
 fromTiles9 :: Tiles9 -> MapLayout
 fromTiles9 Tiles9 {..} = MapLayout $ M.fromList $ concat
@@ -88,7 +93,7 @@ fromTiles4 Tiles4 {..} =
 printMapLayout :: MapLayout -> IO ()
 printMapLayout (MapLayout layout) = do
   let xs = [1 .. 18]
-      ys = ['a' .. 'r']
+      ys = map pure ['a' .. 'r']
 
   for_ ys $ \y' -> do
     let str = flip concatMap xs $ \x' ->

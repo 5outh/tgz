@@ -32,14 +32,13 @@ cyclePlayers game = do
     Just player ->
       pure
         $  game
-        <> (mempty & round .~ mempty { roundCurrentPlayer = Last (Just player) }
-           )
+        <> (mempty & round .~ mempty { roundCurrentPlayer = Just player })
     Nothing -> newRound game
  where
   players' :: [PlayerId]
   players'   = game ^. round . players
 
-  nextPlayer = case (getLast $ game ^. round . currentPlayer) of
+  nextPlayer = case (game ^. round . currentPlayer) of
     Nothing       -> internalError "Could not find current player."
     Just playerId -> case elemIndex playerId players' of
       Nothing -> internalError "Current player was not found in game."
@@ -54,13 +53,12 @@ newRound _ = internalError "cannot start a new round yet"
 
 withPlayer :: PlayerId -> Player -> Game
 withPlayer playerId player =
-  mempty { gamePlayers = Merge (M.singleton playerId player) }
+  mempty { gamePlayers = M.singleton playerId player }
 
 chooseEmpire :: Empire -> PlayerId -> Game -> PlayerAction 'PreSetup
 chooseEmpire empire' playerId game = PlayerAction $ do
-  let chosenEmpires =
-        mapMaybe playerEmpire $ M.elems $ getMerge $ game ^. players
-      withEmpire = mempty { playerEmpire = Just empire' }
+  let chosenEmpires = mapMaybe playerEmpire $ M.elems $ game ^. players
+      withEmpire    = mempty { playerEmpire = Just empire' }
 
   phaseIs PreSetup game
   (empire' `elem` chosenEmpires)
@@ -82,28 +80,26 @@ placeStartingMonument location playerId game = PlayerAction $ do
   -- TODO must be starting location
   pure $ game <> changeSet
  where
-  isStartingMonument = case (game ^. mapLayout . to getFirst) of
+  isStartingMonument = case (game ^. mapLayout) of
     Nothing -> False
     Just (MapLayout layout) ->
       M.lookup location layout == Just (Land StartingArea)
 
-  withStartingMonument =
-    mempty { playerMonuments = Merge (M.singleton location 1) }
-  changeSet = withPlayer playerId withStartingMonument
+  withStartingMonument = mempty { playerMonuments = M.singleton location 1 }
+  changeSet            = withPlayer playerId withStartingMonument
 -- * Generosity of Kings Phase
 
 data GenerosityOfKingsAction = Bid Natural | Pass
 
 getPlayer :: PlayerId -> Game -> Either GameError Player
-getPlayer playerId game =
-  case M.lookup playerId (getMerge $ game ^. players) of
-    Nothing ->
-      invalidAction $ "Player with id " <> tshow playerId <> " does not exist."
-    Just player -> pure player
+getPlayer playerId game = case M.lookup playerId (game ^. players) of
+  Nothing ->
+    invalidAction $ "Player with id " <> tshow playerId <> " does not exist."
+  Just player -> pure player
 
 isPlayersTurn :: PlayerId -> Game -> Either GameError ()
 isPlayersTurn playerId game =
-  when (game ^. round . currentPlayer . to getLast /= Just playerId)
+  when (game ^. round . currentPlayer /= Just playerId)
     $ invalidAction "It is not your turn."
 
 -- TODO: How to cycle players in a foolproof way?
@@ -112,7 +108,7 @@ bid :: Natural -> PlayerId -> Game -> PlayerAction 'GenerosityOfKings
 bid amount playerId game = PlayerAction $ do
   isPlayersTurn playerId game
 
-  (game ^. round . currentPhase . to getLast /= Just GenerosityOfKings)
+  (game ^. round . currentPhase /= Just GenerosityOfKings)
     `impliesInvalid` "You can only take the bid action in the Generosity of Kings phase"
 
   (playerId `elem` game ^. playersPassedLens)
@@ -136,14 +132,13 @@ bid amount playerId game = PlayerAction $ do
   playersPassedLens = round . generosityOfKingsState . playersPassed
 
   minimumBid :: Natural
-  minimumBid =
-    maybe 0 succ $ getLast (game ^. round . generosityOfKingsState . lastBid)
+  minimumBid = maybe 0 succ (game ^. round . generosityOfKingsState . lastBid)
 
   modifiedGenerosityOfKings :: GenerosityOfKingsState
   modifiedGenerosityOfKings =
-    mempty { generosityOfKingsStateCattlePool = Sum (-amount) }
+    mempty { generosityOfKingsStateCattlePool = (-amount) }
 
-  modifiedPlayer = mempty { playerCattle = Sum (negate $ fromIntegral amount) }
+  modifiedPlayer = mempty { playerCattle = (negate $ fromIntegral amount) }
 
 pass :: PlayerId -> Game -> PlayerAction 'GenerosityOfKings
 pass playerId game = PlayerAction $ do

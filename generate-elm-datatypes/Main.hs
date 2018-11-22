@@ -13,7 +13,8 @@ main :: IO ()
 main = do
   writeFile "tgz-frontend/src/ApiTypes.elm" $ makeElmModule
     "ApiTypes"
-    [ DefineElm (Proxy :: Proxy Location)
+    [ DefineElm (Proxy :: Proxy PlayerId)
+    , DefineElm (Proxy :: Proxy Location)
     , DefineElm (Proxy :: Proxy Username)
     , DefineElm (Proxy :: Proxy PlayerInfo)
     , DefineElm (Proxy :: Proxy Empire)

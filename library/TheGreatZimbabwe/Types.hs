@@ -17,12 +17,12 @@
 module TheGreatZimbabwe.Types where
 
 import           Control.Applicative
-import           Data.Map.Strict.Merge
 import           Control.Lens
 import           Data.Aeson                        hiding ( defaultOptions )
 import           Data.Function                            ( on )
 import qualified Data.Map.Strict               as M
 import           Data.Monoid
+import           Data.Maybe
 import qualified Data.Set                      as S
 import qualified Data.Text                     as T
 import           GHC.Generics
@@ -35,11 +35,13 @@ import           Elm.Derive
 
 newtype PlayerId = PlayerId { getPlayerId :: Integer }
   deriving stock (Eq, Ord, Show)
-  deriving newtype (FromJSON, ToJSON, FromJSONKey, ToJSONKey)
+  deriving newtype (FromJSONKey, ToJSONKey)
+
+deriveBoth (unPrefix "get") ''PlayerId
 
 data Location = Location
   { locationX :: !Natural
-  , locationY :: !Char
+  , locationY :: !String
   } deriving (Show, Eq, Ord, Generic)
 
 instance ToJSONKey Location where
@@ -220,20 +222,20 @@ godVR = \case
 data Player = Player
   { playerInfo               :: Maybe PlayerInfo
   -- ^ Info about the human player
-  , playerVictoryRequirement :: Sum Int
+  , playerVictoryRequirement :: Int
   -- ^ Player's current victory requirement
-  , playerVictoryPoints      :: Sum Int
+  , playerVictoryPoints      :: Int
   -- ^ Player's current victory points
   , playerEmpire             :: Maybe Empire
   -- ^ The Empire the Player belongs to. Players have to choose this at the
   -- beginning of the game, so it's initially empty.
-  , playerCattle             :: Sum Int
+  , playerCattle             :: Int
   -- ^ Number of cattle that a Player currently has. Start amount: 3
-  , playerMonuments          :: Merge Location (Sum Natural)
+  , playerMonuments          :: M.Map Location Natural
   -- ^ Locations of player-owned monuments on the map, along with monument height
   , playerCraftsmen          :: M.Map Location Craftsman
   -- ^ Locations of player-owned craftsmen on the map (each individual owned square)
-  , playerTechnologyCards    :: Merge TechnologyCard (Sum Int)
+  , playerTechnologyCards    :: M.Map TechnologyCard Int
   -- ^ Player-owned technology cards, along with the price other players must
   -- pay to use them
   , playerSpecialists        :: S.Set Specialist
@@ -246,13 +248,13 @@ instance Semigroup Player where
   p1 <> p2 = Player
     { playerInfo = on (<|>) playerInfo p1 p2
     --- ^ TODO: This may not be needed
-    , playerVictoryRequirement = on (<>) playerVictoryRequirement p1 p2
-    , playerVictoryPoints = on (<>) playerVictoryPoints p1 p2
+    , playerVictoryRequirement = on (+) playerVictoryRequirement p1 p2
+    , playerVictoryPoints = on (+) playerVictoryPoints p1 p2
     , playerEmpire = on (<|>) playerEmpire p1 p2
-    , playerCattle = on (<>) playerCattle p1 p2
-    , playerMonuments = on (<>) playerMonuments p1 p2
+    , playerCattle = on (+) playerCattle p1 p2
+    , playerMonuments = on (M.unionWith (+)) playerMonuments p1 p2
     , playerCraftsmen = on (<>) playerCraftsmen p1 p2
-    , playerTechnologyCards = on (<>) playerTechnologyCards p1 p2
+    , playerTechnologyCards = on (M.unionWith (+)) playerTechnologyCards p1 p2
     , playerSpecialists = on (<>) playerSpecialists p1 p2
     , playerGod = on (<|>) playerGod p1 p2
     }
@@ -260,10 +262,10 @@ instance Semigroup Player where
 instance Monoid Player where
   mempty = Player
     { playerInfo = Nothing
-    , playerVictoryRequirement = mempty
-    , playerVictoryPoints = mempty
+    , playerVictoryRequirement = 0
+    , playerVictoryPoints = 0
     , playerEmpire = Nothing
-    , playerCattle = mempty
+    , playerCattle = 0
     , playerMonuments = mempty
     , playerCraftsmen = mempty
     , playerTechnologyCards = mempty
@@ -283,10 +285,10 @@ deriveBoth defaultOptions ''UsedMarker
 data GenerosityOfKingsState = GenerosityOfKingsState
   { generosityOfKingsStatePlaques       :: [Empire]
   -- ^ Ordered plaques (static)
-  , generosityOfKingsStateCattlePool    :: Sum Natural
+  , generosityOfKingsStateCattlePool    :: Natural
   -- ^ Total number of cattle that have been bid (this along with plaques
   -- is enough to reconstruct the view)
-  , generosityOfKingsStateLastBid       :: Last Natural
+  , generosityOfKingsStateLastBid       :: Maybe Natural
   -- ^ The last bid made; next bid must be higher (or pass)
   , generosityOfKingsStatePlayersPassed :: [PlayerId]
   -- ^ Which players have passed, in what order?
@@ -295,13 +297,17 @@ data GenerosityOfKingsState = GenerosityOfKingsState
 instance Semigroup GenerosityOfKingsState where
   g1 <> g2 = GenerosityOfKingsState
     { generosityOfKingsStatePlaques = on (<>) generosityOfKingsStatePlaques g1 g2
-    , generosityOfKingsStateCattlePool = on (<>) generosityOfKingsStateCattlePool g1 g2
-    , generosityOfKingsStateLastBid = on (<>) generosityOfKingsStateLastBid g1 g2
+    , generosityOfKingsStateCattlePool = on (+) generosityOfKingsStateCattlePool g1 g2
+    , generosityOfKingsStateLastBid = on plusMay generosityOfKingsStateLastBid g1 g2
     , generosityOfKingsStatePlayersPassed = on (<>) generosityOfKingsStatePlayersPassed g1 g2
     }
+   where
+    plusMay Nothing (Just n) = Just n
+    plusMay (Just n) Nothing = Just n
+    plusMay (Just n) (Just m) = Just $ m + n
 
 instance Monoid GenerosityOfKingsState where
-  mempty = GenerosityOfKingsState mempty mempty mempty mempty
+  mempty = GenerosityOfKingsState mempty 0 Nothing mempty
 
 deriveBoth (unPrefix "generosityOfKingsState") ''GenerosityOfKingsState
 makeLensesWith camelCaseFields ''GenerosityOfKingsState
@@ -317,32 +323,35 @@ data Phase
 
 deriveBoth defaultOptions ''Phase
 
+appendLast :: Maybe a -> Maybe a -> Maybe a
+appendLast a b = if isJust b then b else a
+
 data Round = Round
   { roundPlayers                :: [PlayerId]
   -- ^ Ordered list representing the order of play, determined by
   -- (a) VR in the generosity of kings phase, and
   -- (b) by the generosity of kings phase in other phases.
-  , roundCurrentPlayer          :: Last PlayerId
+  , roundCurrentPlayer          :: Maybe PlayerId
   -- ^ The current player of the round
-  , roundUsedMarkers            :: Merge Location (Last UsedMarker)
+  , roundUsedMarkers            :: M.Map Location UsedMarker
   -- ^ Used marker locations on the map
   , roundGenerosityOfKingsState :: GenerosityOfKingsState
   -- ^ State used in the Generosity of kings phase
-  , roundCurrentPhase           :: Last Phase
+  , roundCurrentPhase           :: Maybe Phase
   -- Current phase of the round
   } deriving (Generic)
 
 instance Semigroup Round where
   r1 <> r2 = Round
     { roundPlayers = on (<>) roundPlayers r1 r2
-    , roundCurrentPlayer = on (<>) roundCurrentPlayer r1 r2
+    , roundCurrentPlayer = on appendLast roundCurrentPlayer r1 r2
     , roundUsedMarkers = on (<>) roundUsedMarkers r1 r2
     , roundGenerosityOfKingsState = on (<>) roundGenerosityOfKingsState r1 r2
-    , roundCurrentPhase = on (<>) roundCurrentPhase r1 r2
+    , roundCurrentPhase = on appendLast roundCurrentPhase r1 r2
     }
 
 instance Monoid Round where
-  mempty = Round mempty mempty mempty mempty mempty
+  mempty = Round mempty Nothing mempty mempty Nothing
 
 deriveBoth (unPrefix "round") ''Round
 makeLensesWith camelCaseFields ''Round
@@ -350,28 +359,28 @@ makeLensesWith camelCaseFields ''Round
 -- Note: unlimited cattle stock
 
 data Game = Game
-  { gamePlayers   :: Merge PlayerId Player
+  { gamePlayers   :: M.Map PlayerId Player
   -- ^ Players of the game, in unordered format.
   , gameRound     :: Round
   -- ^ Current Round state
-  , gameMapLayout :: First MapLayout
+  , gameMapLayout :: Maybe MapLayout
   -- ^ Layout of the Map
-  , gameCraftsmen :: Merge Craftsman (S.Set TechnologyCard)
+  , gameCraftsmen :: M.Map Craftsman (S.Set TechnologyCard)
   -- ^ Remaining Craftsmen of each type
   , gameWinner    :: Maybe PlayerId
   } deriving (Generic)
 
 instance Semigroup Game where
   g1 <> g2 = Game
-    { gamePlayers = on (<>) gamePlayers g1 g2
+    { gamePlayers = on (M.unionWith (<>)) gamePlayers g1 g2
     , gameRound = on (<>) gameRound g1 g2
-    , gameMapLayout = on (<>) gameMapLayout g1 g2
-    , gameCraftsmen = on (<>) gameCraftsmen g1 g2
+    , gameMapLayout = on appendLast gameMapLayout g1 g2
+    , gameCraftsmen = on (M.unionWith (<>)) gameCraftsmen g1 g2
     , gameWinner = on (<|>) gameWinner g1 g2
     }
 
 instance Monoid Game where
-  mempty = Game mempty mempty mempty mempty Nothing
+  mempty = Game mempty mempty Nothing mempty Nothing
 
 deriveBoth (unPrefix "game") ''Game
 makeLensesWith camelCaseFields ''Game

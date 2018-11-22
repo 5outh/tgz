@@ -34,12 +34,13 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 |]
 
 data GameView = GameView
-  { _id           :: GameId
+  { _id           :: Int
   , _name         :: Text
   , _initialState :: Types.Game
   }
 
 toView :: Entity Game -> GameView
-toView (Entity _id (Game _name (JSONB _initialState))) = GameView {..}
+toView (Entity gameId (Game _name (JSONB _initialState))) = GameView {..}
+  where _id = fromIntegral $ fromSqlKey gameId
 
 deriveBoth (unPrefix "_") ''GameView

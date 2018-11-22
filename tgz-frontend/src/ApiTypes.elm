@@ -8,22 +8,33 @@ import Dict exposing (Dict)
 import Set exposing (Set)
 
 
+type alias PlayerId  = Int
+
+jsonDecPlayerId : Json.Decode.Decoder ( PlayerId )
+jsonDecPlayerId =
+    Json.Decode.int
+
+jsonEncPlayerId : PlayerId -> Value
+jsonEncPlayerId  val = Json.Encode.int val
+
+
+
 type alias Location  =
    { x: Int
-   , y: Char
+   , y: String
    }
 
 jsonDecLocation : Json.Decode.Decoder ( Location )
 jsonDecLocation =
    Json.Decode.succeed (\px py -> {x = px, y = py})
    |> required "x" (Json.Decode.int)
-   |> required "y" (jsonDecChar)
+   |> required "y" (Json.Decode.string)
 
 jsonEncLocation : Location -> Value
 jsonEncLocation  val =
    Json.Encode.object
    [ ("x", Json.Encode.int val.x)
-   , ("y", jsonEncChar val.y)
+   , ("y", Json.Encode.string val.y)
    ]
 
 
@@ -314,45 +325,45 @@ jsonEncGod  val =
 
 
 type alias Player  =
-   { info: (Alt Maybe PlayerInfo)
-   , victory_requirement: (Sum Int)
-   , victory_points: (Sum Int)
-   , empire: (Alt Maybe Empire)
-   , cattle: (Sum Int)
-   , monuments: (Merge Location (Sum Int))
+   { info: (Maybe PlayerInfo)
+   , victory_requirement: Int
+   , victory_points: Int
+   , empire: (Maybe Empire)
+   , cattle: Int
+   , monuments: (List (Location, Int))
    , craftsmen: (List (Location, Craftsman))
-   , technology_cards: (Merge TechnologyCard (Sum Int))
+   , technology_cards: (List (TechnologyCard, Int))
    , specialists: (List Specialist)
-   , god: (Alt Maybe God)
+   , god: (Maybe God)
    }
 
 jsonDecPlayer : Json.Decode.Decoder ( Player )
 jsonDecPlayer =
    Json.Decode.succeed (\pinfo pvictory_requirement pvictory_points pempire pcattle pmonuments pcraftsmen ptechnology_cards pspecialists pgod -> {info = pinfo, victory_requirement = pvictory_requirement, victory_points = pvictory_points, empire = pempire, cattle = pcattle, monuments = pmonuments, craftsmen = pcraftsmen, technology_cards = ptechnology_cards, specialists = pspecialists, god = pgod})
-   |> required "info" (jsonDecAlt (jsonDecMaybe) (jsonDecPlayerInfo))
-   |> required "victory_requirement" (jsonDecSum (Json.Decode.int))
-   |> required "victory_points" (jsonDecSum (Json.Decode.int))
-   |> required "empire" (jsonDecAlt (jsonDecMaybe) (jsonDecEmpire))
-   |> required "cattle" (jsonDecSum (Json.Decode.int))
-   |> required "monuments" (jsonDecMerge (jsonDecLocation) (jsonDecSum (Json.Decode.int)))
+   |> fnullable "info" (jsonDecPlayerInfo)
+   |> required "victory_requirement" (Json.Decode.int)
+   |> required "victory_points" (Json.Decode.int)
+   |> fnullable "empire" (jsonDecEmpire)
+   |> required "cattle" (Json.Decode.int)
+   |> required "monuments" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (Json.Decode.int))))
    |> required "craftsmen" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (jsonDecCraftsman))))
-   |> required "technology_cards" (jsonDecMerge (jsonDecTechnologyCard) (jsonDecSum (Json.Decode.int)))
+   |> required "technology_cards" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecTechnologyCard)) (Json.Decode.index 1 (Json.Decode.int))))
    |> required "specialists" (Json.Decode.list (jsonDecSpecialist))
-   |> required "god" (jsonDecAlt (jsonDecMaybe) (jsonDecGod))
+   |> fnullable "god" (jsonDecGod)
 
 jsonEncPlayer : Player -> Value
 jsonEncPlayer  val =
    Json.Encode.object
-   [ ("info", (jsonEncAlt (jsonEncMaybe) (jsonEncPlayerInfo)) val.info)
-   , ("victory_requirement", (jsonEncSum (Json.Encode.int)) val.victory_requirement)
-   , ("victory_points", (jsonEncSum (Json.Encode.int)) val.victory_points)
-   , ("empire", (jsonEncAlt (jsonEncMaybe) (jsonEncEmpire)) val.empire)
-   , ("cattle", (jsonEncSum (Json.Encode.int)) val.cattle)
-   , ("monuments", (jsonEncMerge (jsonEncLocation) ((jsonEncSum (Json.Encode.int)))) val.monuments)
+   [ ("info", (maybeEncode (jsonEncPlayerInfo)) val.info)
+   , ("victory_requirement", Json.Encode.int val.victory_requirement)
+   , ("victory_points", Json.Encode.int val.victory_points)
+   , ("empire", (maybeEncode (jsonEncEmpire)) val.empire)
+   , ("cattle", Json.Encode.int val.cattle)
+   , ("monuments", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncLocation) v1,(Json.Encode.int) v2])) val.monuments)
    , ("craftsmen", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncLocation) v1,(jsonEncCraftsman) v2])) val.craftsmen)
-   , ("technology_cards", (jsonEncMerge (jsonEncTechnologyCard) ((jsonEncSum (Json.Encode.int)))) val.technology_cards)
+   , ("technology_cards", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncTechnologyCard) v1,(Json.Encode.int) v2])) val.technology_cards)
    , ("specialists", (Json.Encode.list jsonEncSpecialist) val.specialists)
-   , ("god", (jsonEncAlt (jsonEncMaybe) (jsonEncGod)) val.god)
+   , ("god", (maybeEncode (jsonEncGod)) val.god)
    ]
 
 
@@ -378,8 +389,8 @@ jsonEncUsedMarker  val =
 
 type alias GenerosityOfKingsState  =
    { plaques: (List Empire)
-   , cattle_pool: (Sum Int)
-   , last_bid: (Last Int)
+   , cattle_pool: Int
+   , last_bid: (Maybe Int)
    , players_passed: (List PlayerId)
    }
 
@@ -387,16 +398,16 @@ jsonDecGenerosityOfKingsState : Json.Decode.Decoder ( GenerosityOfKingsState )
 jsonDecGenerosityOfKingsState =
    Json.Decode.succeed (\pplaques pcattle_pool plast_bid pplayers_passed -> {plaques = pplaques, cattle_pool = pcattle_pool, last_bid = plast_bid, players_passed = pplayers_passed})
    |> required "plaques" (Json.Decode.list (jsonDecEmpire))
-   |> required "cattle_pool" (jsonDecSum (Json.Decode.int))
-   |> required "last_bid" (jsonDecLast (Json.Decode.int))
+   |> required "cattle_pool" (Json.Decode.int)
+   |> fnullable "last_bid" (Json.Decode.int)
    |> required "players_passed" (Json.Decode.list (jsonDecPlayerId))
 
 jsonEncGenerosityOfKingsState : GenerosityOfKingsState -> Value
 jsonEncGenerosityOfKingsState  val =
    Json.Encode.object
    [ ("plaques", (Json.Encode.list jsonEncEmpire) val.plaques)
-   , ("cattle_pool", (jsonEncSum (Json.Encode.int)) val.cattle_pool)
-   , ("last_bid", (jsonEncLast (Json.Encode.int)) val.last_bid)
+   , ("cattle_pool", Json.Encode.int val.cattle_pool)
+   , ("last_bid", (maybeEncode (Json.Encode.int)) val.last_bid)
    , ("players_passed", (Json.Encode.list jsonEncPlayerId) val.players_passed)
    ]
 
@@ -429,64 +440,64 @@ jsonEncPhase  val =
 
 type alias Round  =
    { players: (List PlayerId)
-   , current_player: (Last PlayerId)
-   , used_markers: (Merge Location (Last UsedMarker))
+   , current_player: (Maybe PlayerId)
+   , used_markers: (List (Location, UsedMarker))
    , generosity_of_kings_state: GenerosityOfKingsState
-   , current_phase: (Last Phase)
+   , current_phase: (Maybe Phase)
    }
 
 jsonDecRound : Json.Decode.Decoder ( Round )
 jsonDecRound =
    Json.Decode.succeed (\pplayers pcurrent_player pused_markers pgenerosity_of_kings_state pcurrent_phase -> {players = pplayers, current_player = pcurrent_player, used_markers = pused_markers, generosity_of_kings_state = pgenerosity_of_kings_state, current_phase = pcurrent_phase})
    |> required "players" (Json.Decode.list (jsonDecPlayerId))
-   |> required "current_player" (jsonDecLast (jsonDecPlayerId))
-   |> required "used_markers" (jsonDecMerge (jsonDecLocation) (jsonDecLast (jsonDecUsedMarker)))
+   |> fnullable "current_player" (jsonDecPlayerId)
+   |> required "used_markers" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (jsonDecUsedMarker))))
    |> required "generosity_of_kings_state" (jsonDecGenerosityOfKingsState)
-   |> required "current_phase" (jsonDecLast (jsonDecPhase))
+   |> fnullable "current_phase" (jsonDecPhase)
 
 jsonEncRound : Round -> Value
 jsonEncRound  val =
    Json.Encode.object
    [ ("players", (Json.Encode.list jsonEncPlayerId) val.players)
-   , ("current_player", (jsonEncLast (jsonEncPlayerId)) val.current_player)
-   , ("used_markers", (jsonEncMerge (jsonEncLocation) ((jsonEncLast (jsonEncUsedMarker)))) val.used_markers)
+   , ("current_player", (maybeEncode (jsonEncPlayerId)) val.current_player)
+   , ("used_markers", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncLocation) v1,(jsonEncUsedMarker) v2])) val.used_markers)
    , ("generosity_of_kings_state", jsonEncGenerosityOfKingsState val.generosity_of_kings_state)
-   , ("current_phase", (jsonEncLast (jsonEncPhase)) val.current_phase)
+   , ("current_phase", (maybeEncode (jsonEncPhase)) val.current_phase)
    ]
 
 
 
 type alias Game  =
-   { players: (Merge PlayerId Player)
+   { players: (List (PlayerId, Player))
    , round: Round
-   , map_layout: (First MapLayout)
-   , craftsmen: (Merge Craftsman (List TechnologyCard))
-   , winner: (Alt Maybe PlayerId)
+   , map_layout: (Maybe MapLayout)
+   , craftsmen: (List (Craftsman, (List TechnologyCard)))
+   , winner: (Maybe PlayerId)
    }
 
 jsonDecGame : Json.Decode.Decoder ( Game )
 jsonDecGame =
    Json.Decode.succeed (\pplayers pround pmap_layout pcraftsmen pwinner -> {players = pplayers, round = pround, map_layout = pmap_layout, craftsmen = pcraftsmen, winner = pwinner})
-   |> required "players" (jsonDecMerge (jsonDecPlayerId) (jsonDecPlayer))
+   |> required "players" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecPlayerId)) (Json.Decode.index 1 (jsonDecPlayer))))
    |> required "round" (jsonDecRound)
-   |> required "map_layout" (jsonDecFirst (jsonDecMapLayout))
-   |> required "craftsmen" (jsonDecMerge (jsonDecCraftsman) (Json.Decode.list (jsonDecTechnologyCard)))
-   |> required "winner" (jsonDecAlt (jsonDecMaybe) (jsonDecPlayerId))
+   |> fnullable "map_layout" (jsonDecMapLayout)
+   |> required "craftsmen" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecCraftsman)) (Json.Decode.index 1 (Json.Decode.list (jsonDecTechnologyCard)))))
+   |> fnullable "winner" (jsonDecPlayerId)
 
 jsonEncGame : Game -> Value
 jsonEncGame  val =
    Json.Encode.object
-   [ ("players", (jsonEncMerge (jsonEncPlayerId) (jsonEncPlayer)) val.players)
+   [ ("players", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncPlayerId) v1,(jsonEncPlayer) v2])) val.players)
    , ("round", jsonEncRound val.round)
-   , ("map_layout", (jsonEncFirst (jsonEncMapLayout)) val.map_layout)
-   , ("craftsmen", (jsonEncMerge (jsonEncCraftsman) ((Json.Encode.list jsonEncTechnologyCard))) val.craftsmen)
-   , ("winner", (jsonEncAlt (jsonEncMaybe) (jsonEncPlayerId)) val.winner)
+   , ("map_layout", (maybeEncode (jsonEncMapLayout)) val.map_layout)
+   , ("craftsmen", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncCraftsman) v1,((Json.Encode.list jsonEncTechnologyCard)) v2])) val.craftsmen)
+   , ("winner", (maybeEncode (jsonEncPlayerId)) val.winner)
    ]
 
 
 
 type alias GameView  =
-   { id: GameId
+   { id: Int
    , name: String
    , initial_state: Game
    }
@@ -494,14 +505,14 @@ type alias GameView  =
 jsonDecGameView : Json.Decode.Decoder ( GameView )
 jsonDecGameView =
    Json.Decode.succeed (\pid pname pinitial_state -> {id = pid, name = pname, initial_state = pinitial_state})
-   |> required "id" (jsonDecGameId)
+   |> required "id" (Json.Decode.int)
    |> required "name" (Json.Decode.string)
    |> required "initial_state" (jsonDecGame)
 
 jsonEncGameView : GameView -> Value
 jsonEncGameView  val =
    Json.Encode.object
-   [ ("id", jsonEncGameId val.id)
+   [ ("id", Json.Encode.int val.id)
    , ("name", Json.Encode.string val.name)
    , ("initial_state", jsonEncGame val.initial_state)
    ]

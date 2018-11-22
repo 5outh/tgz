@@ -20,12 +20,12 @@ phaseIs phase game =
                      <> tshow currentPhase'
                      <> ")"
                      )
-  where currentPhase' = getLast $ game ^. round . currentPhase
+  where currentPhase' = game ^. round . currentPhase
 
 playerIs :: PlayerId -> Game -> Either GameError ()
 playerIs playerId game =
   (Just playerId /= current) `impliesInvalid` "It's not your turn."
-  where current = game ^. round . currentPlayer . to getLast
+  where current = game ^. round . currentPlayer
 
 impliesInvalid :: Bool -> T.Text -> Either GameError ()
 predicate `impliesInvalid` err = when predicate $ invalidAction err
