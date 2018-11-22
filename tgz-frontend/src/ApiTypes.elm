@@ -17,17 +17,10 @@ type alias GameView  =
 
 jsonDecGameView : Decoder GameView
 jsonDecGameView =
-   Decode.succeed (\pid pname pstate-> {id = pid, name = pname, state = pstate})
+   Decode.succeed (\a b c -> {id = a, name = b, state = c})
    |> required "id" (Decode.int)
    |> required "name" (Decode.string)
    |> required "state" jsonDecGame
-
-jsonEncGameView : GameView -> Value
-jsonEncGameView  val =
-   Encode.object
-   [ ("id", Encode.int val.id)
-   , ("name", Encode.string val.name)
-   ]
 
 type alias Game =
   { players: Dict Int Player
@@ -35,17 +28,30 @@ type alias Game =
 
 jsonDecGame : Json.Decode.Decoder Game
 jsonDecGame =
-   Json.Decode.succeed (\pplayers -> {players = pplayers})
+   Json.Decode.succeed (\a -> {players = a})
    |> required "players" (intDict jsonDecPlayer)
 
 type alias Player =
-    { victoryRequirement: Int
+    { info: PlayerInfo
+    , victoryRequirement: Int
     }
 
 jsonDecPlayer : Json.Decode.Decoder Player
 jsonDecPlayer =
-   Json.Decode.succeed (\pvictoryRequirement -> {victoryRequirement = pvictoryRequirement})
+   Json.Decode.succeed (\a b -> {info = a,  victoryRequirement = b})
+   |> required "info" jsonDecPlayerInfo
    |> required "victory_requirement" Json.Decode.int
+
+type alias PlayerInfo =
+    { username: String
+    , email: String
+    }
+
+jsonDecPlayerInfo : Json.Decode.Decoder PlayerInfo
+jsonDecPlayerInfo =
+   Json.Decode.succeed (\a b -> {username = a, email = b})
+   |> required "username" Json.Decode.string
+   |> required "email" Json.Decode.string
 
 -- * Helpers
 
