@@ -1,4 +1,3 @@
 *.cabal
 .stack-work/
-.tgz-frontend/elm-stuff
-.tgz-frontend/public
+tgz-frontend/elm-stuff/
