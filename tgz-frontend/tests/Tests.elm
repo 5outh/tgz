@@ -1,7 +1,11 @@
-module Tests exposing (..)
+module Tests exposing (all)
 
-import Test exposing (..)
+import ApiTypes exposing (Land(..), Square(..), decodeMapLayout, decodeSquare)
+import Dict
 import Expect
+import Json.Decode as Decode exposing (Decoder)
+import Test exposing (..)
+
 
 
 -- Check out http://package.elm-lang.org/packages/elm-community/elm-test/latest to learn more about testing in Elm!
@@ -16,7 +20,17 @@ all =
         , test "String.left" <|
             \_ ->
                 Expect.equal "a" (String.left 1 "abcdefg")
-        , test "This test should fail" <|
+        , test "decodeSquare" <|
             \_ ->
-                Expect.fail "failed as expected!"
+                Expect.equal
+                    (Ok (Land BlankLand))
+                    (Decode.decodeString decodeSquare "{\"Land\": {\"BlankLand\": []}}")
+        , test "decodeMapLayout" <|
+            \_ ->
+                Expect.equal
+                    (Ok (Dict.fromList [ ( ( 0, "a" ), Land BlankLand ) ]))
+                    (Decode.decodeString
+                        decodeMapLayout
+                        "[[{\"x\": 0, \"y\": \"a\"}, {\"Land\": {\"BlankLand\": []}}]]"
+                    )
         ]

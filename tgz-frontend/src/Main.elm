@@ -49,7 +49,7 @@ update msg model =
         GotGame result ->
             case result of
                 Err err ->
-                    ( { model | game = Failure (Debug.log "error!" err) }, Cmd.none )
+                    ( { model | game = Failure err }, Cmd.none )
 
                 Ok gameView ->
                     ( { model | game = Success gameView }, Cmd.none )
@@ -114,11 +114,11 @@ listPlayers players =
             li []
                 [ div []
                     [ h3 [] [ text player.info.username ]
-                    , p [] [ text (String.append "Empire: " (showPlayerEmpire player)) ]
-                    , p [] [ text (String.append "God: " (showPlayerGod player)) ]
-                    , p [] [ text (String.append "VR: " (String.fromInt player.victoryRequirement)) ]
-                    , p [] [ text (String.append "VP: " (String.fromInt player.victoryPoints)) ]
-                    , p [] [ text (String.append "Cattle: " (String.fromInt player.cattle)) ]
+                    , p [] [ text ("Empire: " ++ showPlayerEmpire player) ]
+                    , p [] [ text ("God: " ++ showPlayerGod player) ]
+                    , p [] [ text ("VR: " ++ String.fromInt player.victoryRequirement) ]
+                    , p [] [ text ("VP: " ++ String.fromInt player.victoryPoints) ]
+                    , p [] [ text ("Cattle: " ++ String.fromInt player.cattle) ]
                     ]
                 ]
     in

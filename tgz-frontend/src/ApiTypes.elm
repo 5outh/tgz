@@ -1,4 +1,4 @@
-module ApiTypes exposing (Empire(..), Game, GameView, God(..), Player, PlayerInfo, arbitraryDict, decodeEmpire, decodeGame, decodeGameView, decodeGod, decodePlayer, decodePlayerInfo, intDict, showEmpire, showGod)
+module ApiTypes exposing (Empire(..), Game, GameView, God(..), Land(..), Player, PlayerInfo, Square(..), arbitraryDict, decodeEmpire, decodeGame, decodeGameView, decodeGod, decodeLand, decodeMapLayout, decodePlayer, decodePlayerInfo, decodeSquare, intDict, showEmpire, showGod)
 
 -- The following module comes from bartavelle/json-helpers
 
@@ -26,13 +26,15 @@ decodeGameView =
 
 type alias Game =
     { players : Dict Int Player
+    , mapLayout : Dict Location Square
     }
 
 
 decodeGame : Decoder Game
 decodeGame =
-    Decode.succeed (\a -> { players = a })
+    Decode.succeed (\a b -> { players = a, mapLayout = b })
         |> required "players" (intDict decodePlayer)
+        |> required "map_layout" decodeMapLayout
 
 
 type alias Player =
@@ -185,6 +187,84 @@ showGod god =
 
         Xango ->
             "Xango"
+
+
+type Square
+    = Water
+    | Land Land
+
+
+decodeSquare : Decoder Square
+decodeSquare =
+    let
+        jsonDecDictSquare =
+            Dict.fromList
+                [ ( "Water", Decode.lazy (\_ -> Decode.succeed Water) )
+                , ( "Land", Decode.lazy (\_ -> Decode.map Land decodeLand) )
+                ]
+    in
+    decodeSumObjectWithSingleField "Square" jsonDecDictSquare
+
+
+type Land
+    = StartingArea
+    | Resource Resource
+    | BlankLand
+
+
+decodeLand : Decoder Land
+decodeLand =
+    let
+        jsonDecDictLand =
+            Dict.fromList
+                [ ( "StartingArea", Decode.lazy (\_ -> Decode.succeed StartingArea) )
+                , ( "Resource", Decode.lazy (\_ -> Decode.map Resource decodeResource) )
+                , ( "BlankLand", Decode.lazy (\_ -> Decode.succeed BlankLand) )
+                ]
+    in
+    decodeSumObjectWithSingleField "Land" jsonDecDictLand
+
+
+type Resource
+    = Clay
+    | Wood
+    | Ivory
+    | Diamonds
+
+
+decodeResource : Decoder Resource
+decodeResource =
+    let
+        jsonDecDictResource =
+            Dict.fromList [ ( "Clay", Clay ), ( "Wood", Wood ), ( "Ivory", Ivory ), ( "Diamonds", Diamonds ) ]
+    in
+    decodeSumNullaries "Resource" jsonDecDictResource
+
+
+type alias Location =
+    ( Int, String )
+
+
+decodeLocation : Decoder Location
+decodeLocation =
+    Decode.succeed (\px py -> ( px, py ))
+        |> required "x" Decode.int
+        |> required "y" Decode.string
+
+
+type alias MapLayout =
+    Dict Location Square
+
+
+decodeMapLayout =
+    Decode.map
+        Dict.fromList
+        (Decode.list
+            (Decode.map2 tuple2
+                (Decode.index 0 decodeLocation)
+                (Decode.index 1 decodeSquare)
+            )
+        )
 
 
 
