@@ -11,7 +11,7 @@ import           TheGreatZimbabwe.Types
 
 main :: IO ()
 main = do
-  writeFile "tgz-frontend/src/ApiTypes.elm" $ makeElmModule
+  writeFile "tgz-frontend/src/ApiTypes.elm.bak" $ makeElmModule
     "ApiTypes"
     [ DefineElm (Proxy :: Proxy PlayerId)
     , DefineElm (Proxy :: Proxy Location)
