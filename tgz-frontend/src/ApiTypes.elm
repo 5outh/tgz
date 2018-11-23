@@ -1,4 +1,4 @@
-module ApiTypes exposing (Empire(..), Game, GameView, God(..), Land(..), Player, PlayerInfo, Square(..), arbitraryDict, decodeEmpire, decodeGame, decodeGameView, decodeGod, decodeLand, decodeMapLayout, decodePlayer, decodePlayerInfo, decodeSquare, intDict, showEmpire, showGod)
+module ApiTypes exposing (Empire(..), Game, GameView, God(..), Land(..), MapLayout, Player, PlayerInfo, Square(..), arbitraryDict, decodeEmpire, decodeGame, decodeGameView, decodeGod, decodeLand, decodeMapLayout, decodePlayer, decodePlayerInfo, decodeSquare, encodeMapLayout, intDict, showEmpire, showGod)
 
 -- The following module comes from bartavelle/json-helpers
 
@@ -206,6 +206,20 @@ decodeSquare =
     decodeSumObjectWithSingleField "Square" jsonDecDictSquare
 
 
+encodeSquare : Square -> Value
+encodeSquare val =
+    let
+        keyval v =
+            case v of
+                Water ->
+                    ( "Water", encodeValue (Encode.list identity []) )
+
+                Land v1 ->
+                    ( "Land", encodeValue (encodeLand v1) )
+    in
+    encodeSumObjectWithSingleField keyval val
+
+
 type Land
     = StartingArea
     | Resource Resource
@@ -225,6 +239,23 @@ decodeLand =
     decodeSumObjectWithSingleField "Land" jsonDecDictLand
 
 
+encodeLand : Land -> Value
+encodeLand val =
+    let
+        keyval v =
+            case v of
+                StartingArea ->
+                    ( "StartingArea", encodeValue (Encode.list identity []) )
+
+                Resource v1 ->
+                    ( "Resource", encodeValue (encodeResource v1) )
+
+                BlankLand ->
+                    ( "BlankLand", encodeValue (Encode.list identity []) )
+    in
+    encodeSumObjectWithSingleField keyval val
+
+
 type Resource
     = Clay
     | Wood
@@ -241,6 +272,22 @@ decodeResource =
     decodeSumNullaries "Resource" jsonDecDictResource
 
 
+encodeResource : Resource -> Value
+encodeResource val =
+    case val of
+        Clay ->
+            Encode.string "Clay"
+
+        Wood ->
+            Encode.string "Wood"
+
+        Ivory ->
+            Encode.string "Ivory"
+
+        Diamonds ->
+            Encode.string "Diamonds"
+
+
 type alias Location =
     ( Int, String )
 
@@ -252,10 +299,19 @@ decodeLocation =
         |> required "y" Decode.string
 
 
+encodeLocation : Location -> Value
+encodeLocation ( x, y ) =
+    Encode.object
+        [ ( "x", Encode.int x )
+        , ( "y", Encode.string y )
+        ]
+
+
 type alias MapLayout =
     Dict Location Square
 
 
+decodeMapLayout : Decoder MapLayout
 decodeMapLayout =
     Decode.map
         Dict.fromList
@@ -265,6 +321,13 @@ decodeMapLayout =
                 (Decode.index 1 decodeSquare)
             )
         )
+
+
+encodeMapLayout : MapLayout -> Value
+encodeMapLayout val =
+    Encode.list
+        (\( v1, v2 ) -> Encode.list identity [ encodeLocation v1, encodeSquare v2 ])
+        (Dict.toList val)
 
 
 

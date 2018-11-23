@@ -1,9 +1,14 @@
 import './main.css';
 import { Elm } from './Main.elm';
 import registerServiceWorker from './registerServiceWorker';
+import { renderMapLayout, initializeGameCanvas } from './game';
 
-Elm.Main.init({
+var app = Elm.Main.init({
   node: document.getElementById('root')
 });
 
 registerServiceWorker();
+
+app.ports.renderMapLayout.subscribe(function(mapLayout) {
+  renderMapLayout(mapLayout);
+});

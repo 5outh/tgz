@@ -1,11 +1,14 @@
 module Main exposing (Fetch(..), Model, Msg(..), getGame, init, listPlayers, main, update, view)
 
-import ApiTypes as ApiTypes exposing (GameView, Player, decodeGameView, showEmpire)
+import ApiTypes as ApiTypes exposing (GameView, MapLayout, Player, decodeGameView, encodeMapLayout, showEmpire)
 import Browser
+import Canvas
+import CanvasColor as Color exposing (Color)
 import Dict
 import Html exposing (Html, div, h1, h3, img, li, p, text, ul)
-import Html.Attributes exposing (src)
+import Html.Attributes exposing (id, src, style)
 import Http
+import Ports
 
 
 
@@ -18,7 +21,7 @@ type alias Model =
 
 getGame =
     Http.get
-        "http://localhost:8000/game/2"
+        "http://localhost:8000/game/3"
         decodeGameView
 
 
@@ -52,7 +55,9 @@ update msg model =
                     ( { model | game = Failure err }, Cmd.none )
 
                 Ok gameView ->
-                    ( { model | game = Success gameView }, Cmd.none )
+                    ( { model | game = Success gameView }
+                    , Ports.renderMapLayout (encodeMapLayout gameView.state.mapLayout)
+                    )
 
 
 
@@ -118,7 +123,7 @@ listPlayers players =
                     , p [] [ text ("God: " ++ showPlayerGod player) ]
                     , p [] [ text ("VR: " ++ String.fromInt player.victoryRequirement) ]
                     , p [] [ text ("VP: " ++ String.fromInt player.victoryPoints) ]
-                    , p [] [ text ("Cattle: " ++ String.fromInt player.cattle) ]
+                    , p [] [ text ("🐄: " ++ String.fromInt player.cattle) ]
                     ]
                 ]
     in
