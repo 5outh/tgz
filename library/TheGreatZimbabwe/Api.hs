@@ -48,6 +48,8 @@ routes pool = do
       Nothing   -> status notFound404 *> json ()
       Just game -> status ok200 *> json (Game.toView game)
 
+  --Scotty.post "/game/:gameId/player/:username/command" $ do
+
   Scotty.post "/new-game" $ do
     addHeader "Access-Control-Allow-Origin" "*"
     userIds :: [User.UserId] <- map (toSqlKey . fromIntegral)

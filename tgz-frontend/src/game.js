@@ -50,7 +50,6 @@ export function renderMapLayout(mapLayout) {
       if (square.Land) {
         ctx.fillStyle = 'Linen';
         if (square.Land.StartingArea) {
-          // set this based off of square type
           ctx.strokeStyle="Tan";
           //ctx.fillStyle = 'SlateGray';
           ctx.fillRect(x, y, size, size)

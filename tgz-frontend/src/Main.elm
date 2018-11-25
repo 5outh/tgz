@@ -5,10 +5,12 @@ import Browser
 import Canvas
 import CanvasColor as Color exposing (Color)
 import Dict
-import Html exposing (Html, div, h1, h3, img, li, p, text, ul)
-import Html.Attributes exposing (id, src, style)
+import Html exposing (Html, canvas, div, h1, h3, img, li, p, text, ul)
+import Html.Attributes exposing (height, id, src, style, width)
+import Html.Keyed exposing (node)
 import Http
 import Ports
+import Task
 
 
 
@@ -25,10 +27,21 @@ getGame =
         decodeGameView
 
 
+
+-- TODO: Apparrently this is bad?
+
+
+send : msg -> Cmd msg
+send msg =
+    Task.succeed msg
+        |> Task.perform identity
+
+
 init : ( Model, Cmd Msg )
 init =
     ( { game = Loading }
-    , Http.send GotGame getGame
+    , send Load
+      -- Http.send GotGame getGame
     )
 
 
@@ -44,11 +57,15 @@ type Fetch err a
 
 type Msg
     = GotGame (Result Http.Error GameView)
+    | Load
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Load ->
+            ( model, Http.send GotGame getGame )
+
         GotGame result ->
             case result of
                 Err err ->
@@ -92,7 +109,7 @@ renderGame game =
         [ div []
             [ h1 [] [ text game.name ]
             ]
-        , listPlayers (Dict.values game.state.players)
+        , div [] [ listPlayers (Dict.values game.state.players) ]
         ]
 
 
