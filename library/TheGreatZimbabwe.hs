@@ -15,9 +15,7 @@ import           Control.Lens
 import           Control.Monad
 import           Data.List
 import qualified Data.Map.Strict                    as M
-import           Data.Map.Strict.Merge
 import           Data.Maybe
-import           Data.Monoid
 import           Numeric.Natural
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Text
@@ -29,8 +27,7 @@ import           TheGreatZimbabwe.Validation
 
 runGameCommand :: Game -> GameCommand -> Either GameError Game
 runGameCommand game = \case
-  ChooseEmpire empire playerId ->
-    getPlayerAction (chooseEmpire empire playerId game)
+  ChooseEmpire e playerId -> getPlayerAction (chooseEmpire e playerId game)
   PlaceStartingMonument location playerId ->
     getPlayerAction (placeStartingMonument location playerId game)
 

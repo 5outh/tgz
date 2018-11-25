@@ -5,7 +5,6 @@ import           Prelude                hiding (round)
 
 import           Control.Lens
 import           Control.Monad          (when)
-import           Data.Monoid
 import qualified Data.Text              as T
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Text

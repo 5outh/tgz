@@ -2,7 +2,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 module TheGreatZimbabwe.Error where
 
-import           Data.Aeson   hiding (defaultOptions)
 import qualified Data.Text    as T
 import           Elm.Derive
 import           GHC.Generics

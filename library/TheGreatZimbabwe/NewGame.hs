@@ -6,8 +6,6 @@ module TheGreatZimbabwe.NewGame where
 
 import           Data.Bifunctor
 import qualified Data.Map.Strict            as M
-import           Data.Map.Strict.Merge
-import           Data.Monoid
 import qualified Data.Set                   as S
 import           Safe                       (headMay)
 import           System.Random.Shuffle
