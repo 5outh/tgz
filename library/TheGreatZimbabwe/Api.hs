@@ -11,20 +11,26 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import           Data.Pool
+import           Data.Text                          (Text)
+import           Data.Time.Clock                    (getCurrentTime)
 import           Database.Persist.Postgresql
-import qualified Database.Persist.Postgresql       as P
-import           GHC.Int                           (Int64)
+import qualified Database.Persist.Postgresql        as P
+import           GHC.Int                            (Int64)
 import           Network.HTTP.Types.Status
-import qualified TheGreatZimbabwe.Database.Command as Command
-import qualified TheGreatZimbabwe.Database.Game    as Game
+import           TheGreatZimbabwe
+import qualified TheGreatZimbabwe.Database.Command  as Command
+import qualified TheGreatZimbabwe.Database.Game     as Game
 import           TheGreatZimbabwe.Database.JSONB
-import qualified TheGreatZimbabwe.Database.User    as User
+import qualified TheGreatZimbabwe.Database.User     as User
+import qualified TheGreatZimbabwe.Database.User     as User
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.NewGame
 import           TheGreatZimbabwe.Types
+import           TheGreatZimbabwe.Types.GameCommand
 import           Web.Scotty
-import qualified Web.Scotty                        as Scotty
+import qualified Web.Scotty                         as Scotty
 
+-- TODO: Environment Variables
 devString :: ConnectionString
 devString = "host=localhost dbname=tgz_dev user=bendotk port=5432"
 
@@ -48,7 +54,42 @@ routes pool = do
       Nothing   -> status notFound404 *> json ()
       Just game -> status ok200 *> json (Game.toView game)
 
-  --Scotty.post "/game/:gameId/player/:username/command" $ do
+  Scotty.post "/game/:gameId/player/:username/command" $ do
+    gameId <- toSqlKey . fromIntegral <$> param @Int "gameId"
+    mGame  <- runDB pool $ selectFirst [persistIdField ==. gameId] []
+    case mGame of
+      Nothing   -> status notFound404 *> json ()
+      Just game -> do
+        -- TODO: mkUsername
+        username <- param @Text "username"
+        mUser    <- runDB pool $ getBy (User.UniqueUsername username)
+        case mUser of
+          Nothing   -> status notFound404 *> json ()
+          Just user -> do
+            preview  <- flag "preview"
+            command  <- jsonData @GameCommand
+            commands <- runDB pool
+              $ Command.fetchGameCommandsForGame (entityKey game)
+            now <- liftIO getCurrentTime
+
+            let eGameState = runGameCommands
+                  (unJSONB $ Game.gameInitialState (entityVal game))
+                  (commands ++ [command])
+
+            liftIO $ print preview
+
+            case eGameState of
+              Left  gameError -> json gameError
+              Right gameState -> do
+                when (not preview)
+                  $ void
+                  $ runDB pool
+                  $ Command.insertGameCommand (entityKey game)
+                                              (entityKey user)
+                                              now
+                                              command
+                status ok200
+                json (Game.fromGameState game gameState)
 
   Scotty.post "/new-game" $ do
     addHeader "Access-Control-Allow-Origin" "*"
@@ -70,6 +111,10 @@ routes pool = do
         case mSavedGameData of
           Nothing            -> status internalServerError500 *> json ()
           Just savedGameData -> json (Game.toView savedGameData)
+
+flag paramName = do
+  ps <- params
+  pure $ paramName `elem` map fst ps
 
 runDB
   :: (MonadIO m, MonadBaseControl IO m)

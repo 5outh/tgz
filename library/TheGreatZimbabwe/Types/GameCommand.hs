@@ -10,6 +10,6 @@ import           TheGreatZimbabwe.Types
 data GameCommand
   = ChooseEmpire Empire PlayerId
   | PlaceStartingMonument Location PlayerId
-  deriving Generic
+  deriving (Generic, Show)
 
 deriveBoth defaultOptions ''GameCommand

@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE PolyKinds           #-}
 {-# LANGUAGE RankNTypes          #-}
@@ -8,12 +9,12 @@
 
 module TheGreatZimbabwe where
 
-import           Prelude                     hiding (round)
+import           Prelude                            hiding (round)
 
 import           Control.Lens
 import           Control.Monad
 import           Data.List
-import qualified Data.Map.Strict             as M
+import qualified Data.Map.Strict                    as M
 import           Data.Map.Strict.Merge
 import           Data.Maybe
 import           Data.Monoid
@@ -21,7 +22,25 @@ import           Numeric.Natural
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
+import           TheGreatZimbabwe.Types.GameCommand
 import           TheGreatZimbabwe.Validation
+
+-- Run a game command
+
+runGameCommand :: Game -> GameCommand -> Either GameError Game
+runGameCommand game = \case
+  ChooseEmpire empire playerId ->
+    getPlayerAction (chooseEmpire empire playerId game)
+  PlaceStartingMonument location playerId ->
+    getPlayerAction (placeStartingMonument location playerId game)
+
+runGameCommands :: Game -> [GameCommand] -> Either GameError Game
+runGameCommands game commands = foldl' go (Right game) commands
+ where
+  go :: Either GameError Game -> GameCommand -> Either GameError Game
+  go eGame command = case eGame of
+    Left  err   -> Left err
+    Right game' -> runGameCommand game' command
 
 -- * Common
 

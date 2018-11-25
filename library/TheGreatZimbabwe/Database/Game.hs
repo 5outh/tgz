@@ -16,6 +16,7 @@ module TheGreatZimbabwe.Database.Game
   , migrateAll
   , GameView
   , toView
+  , fromGameState
   )
 where
 
@@ -44,3 +45,8 @@ toView (Entity gameId (Game _name (JSONB _state))) = GameView {..}
   where _id = fromIntegral $ fromSqlKey gameId
 
 deriveBoth (unPrefix "_") ''GameView
+
+-- For use for preview
+fromGameState :: Entity Game -> Types.Game -> GameView
+fromGameState (Entity gameId (Game _name _)) _state = GameView {..}
+  where _id = fromIntegral $ fromSqlKey gameId

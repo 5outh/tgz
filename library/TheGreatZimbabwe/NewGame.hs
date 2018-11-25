@@ -16,7 +16,7 @@ import qualified TheGreatZimbabwe.MapLayout as MapLayout
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
 
-newGame :: [(PlayerId, PlayerInfo)] -> IO (GameEvent 'Setup)
+newGame :: [(PlayerId, PlayerInfo)] -> IO (GameEvent 'PreSetup)
 newGame playerList = GameEvent <$> do
   -- probably want 'EitherT' here
   eMapLayout <- case (length playerList) of
@@ -48,7 +48,7 @@ newGame playerList = GameEvent <$> do
               , generosityOfKingsStateLastBid       = Nothing
               , generosityOfKingsStatePlayersPassed = []
               }
-            , roundCurrentPhase           = Just Setup
+            , roundCurrentPhase           = Just PreSetup
             }
           gameCraftsmen = newGameCraftsmen
           gameWinner    = Nothing

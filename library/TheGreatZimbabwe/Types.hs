@@ -54,7 +54,7 @@ deriveBoth (unPrefix "location") ''Location
 makeLensesWith camelCaseFields ''Location
 
 newtype Username = Username { usernameUsername :: T.Text }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 deriveBoth (unPrefix "username") ''Username
 makeLensesWith camelCaseFields ''Username
@@ -64,7 +64,7 @@ data PlayerInfo = PlayerInfo
   -- ^ A Player's unique username
   , playerInfoEmail    :: T.Text
   -- ^ A Player's unique email address
-  } deriving (Generic)
+  } deriving (Generic, Show)
 
 deriveBoth (unPrefix "playerInfo") ''PlayerInfo
 makeLensesWith camelCaseFields ''PlayerInfo
@@ -115,7 +115,7 @@ data Craftsman
   | VesselMaker
   | ThroneMaker
   | Sculptor
-    deriving (Eq, Ord, Generic)
+    deriving (Eq, Ord, Generic, Show)
 
 instance FromJSONKey Craftsman where
   fromJSONKey = FromJSONKeyValue parseJSON
@@ -135,7 +135,7 @@ data TechnologyCard = TechnologyCard
   , technologyCardVictoryRequirement :: Natural
   , technologyCardVictoryPoints      :: Natural
   , technologyCardCost               :: Natural
-  } deriving (Eq, Ord, Generic)
+  } deriving (Eq, Ord, Generic, Show)
 
 instance FromJSONKey TechnologyCard where
   fromJSONKey = FromJSONKeyValue parseJSON
@@ -160,7 +160,7 @@ data Specialist
   -- this card.
   | Nomads
   -- ^ Pay 2 cattle to ignore zoning restrictions when building a new monument
-    deriving (Eq, Ord, Generic)
+    deriving (Eq, Ord, Generic, Show)
 
 deriveBoth defaultOptions ''Specialist
 
@@ -197,7 +197,7 @@ data God
   -- ^ Receives 2 additional cattle in each revenue phase
   | Xango
   -- ^ Victory Requirement - 2
-    deriving (Generic)
+    deriving (Generic, Show)
 
 deriveBoth defaultOptions ''God
 
@@ -242,7 +242,7 @@ data Player = Player
   -- ^ Player-owned specialist cards
   , playerGod                :: Maybe God
   -- ^ God a player adores
-  } deriving (Generic)
+  } deriving (Generic, Show)
 
 instance Semigroup Player where
   p1 <> p2 = Player
@@ -278,7 +278,7 @@ makeLensesWith camelCaseFields ''Player
 
 -- Note: UsedTwice only occurs when Atete is in play.
 data UsedMarker = NotUsed | Used | UsedTwice
-  deriving (Generic)
+  deriving (Generic, Show)
 
 deriveBoth defaultOptions ''UsedMarker
 
@@ -292,7 +292,7 @@ data GenerosityOfKingsState = GenerosityOfKingsState
   -- ^ The last bid made; next bid must be higher (or pass)
   , generosityOfKingsStatePlayersPassed :: [PlayerId]
   -- ^ Which players have passed, in what order?
-  } deriving (Generic)
+  } deriving (Generic, Show)
 
 instance Semigroup GenerosityOfKingsState where
   g1 <> g2 = GenerosityOfKingsState
@@ -302,6 +302,7 @@ instance Semigroup GenerosityOfKingsState where
     , generosityOfKingsStatePlayersPassed = on (<>) generosityOfKingsStatePlayersPassed g1 g2
     }
    where
+    plusMay Nothing Nothing = Nothing
     plusMay Nothing (Just n) = Just n
     plusMay (Just n) Nothing = Just n
     plusMay (Just n) (Just m) = Just $ m + n
@@ -339,7 +340,7 @@ data Round = Round
   -- ^ State used in the Generosity of kings phase
   , roundCurrentPhase           :: Maybe Phase
   -- Current phase of the round
-  } deriving (Generic)
+  } deriving (Generic, Show)
 
 instance Semigroup Round where
   r1 <> r2 = Round
@@ -368,7 +369,7 @@ data Game = Game
   , gameCraftsmen :: M.Map Craftsman (S.Set TechnologyCard)
   -- ^ Remaining Craftsmen of each type
   , gameWinner    :: Maybe PlayerId
-  } deriving (Generic)
+  } deriving (Generic, Show)
 
 instance Semigroup Game where
   g1 <> g2 = Game
