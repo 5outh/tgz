@@ -25,7 +25,7 @@ import           Data.Monoid
 import           Data.Maybe
 import qualified Data.Set                      as S
 import qualified Data.Text                     as T
-import           GHC.Generics
+import           GHC.Generics                      hiding ( to )
 import           Numeric.Natural
 import           Prelude                           hiding ( round )
 import           TheGreatZimbabwe.Error
@@ -244,6 +244,22 @@ data Player = Player
   -- ^ God a player adores
   } deriving (Generic, Show)
 
+enrichPlayerVP :: Player -> Player
+enrichPlayerVP player@(Player {..}) =
+  player & victoryPoints +~ fromIntegral extraVictoryPoints
+ where
+  extraVictoryPoints = sum [monumentVP, technologyCardVP]
+  monumentVP         = sum $ map getHeightVP (M.elems playerMonuments)
+  technologyCardVP =
+    sum $ map technologyCardVictoryPoints (M.keys playerTechnologyCards)
+  getHeightVP = \case
+    1 -> 1
+    2 -> 3
+    3 -> 7
+    4 -> 13
+    5 -> 21
+    _ -> error "Height invalid!"
+
 instance Semigroup Player where
   p1 <> p2 = Player
     { playerInfo = on (<|>) playerInfo p1 p2
@@ -385,6 +401,9 @@ instance Monoid Game where
 
 deriveBoth (unPrefix "game") ''Game
 makeLensesWith camelCaseFields ''Game
+
+enrichPlayersVP :: Game -> Game
+enrichPlayersVP game = game & players %~ fmap enrichPlayerVP
 
 -- | Resource a craftsman requires
 craftsmanResource :: Craftsman -> Resource

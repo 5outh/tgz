@@ -36,7 +36,8 @@ runGameCommand game = \case
     handleFinishSetup (placeStartingMonument location playerId game)
 
 runGameCommands :: Game -> [GameCommand] -> Either GameError Game
-runGameCommands game commands = foldl' go (Right game) commands
+runGameCommands game commands =
+  enrichPlayersVP <$> foldl' go (Right game) commands
  where
   go :: Either GameError Game -> GameCommand -> Either GameError Game
   go eGame command = case eGame of
@@ -92,8 +93,6 @@ handleFinishPreSetup (PlayerAction act) = do
     else game
 
 -- * Setup
-
--- TODO: PlayerId should always match current player id
 
 handleFinishSetup :: PlayerAction 'Setup -> Either GameError Game
 handleFinishSetup (PlayerAction act) = do
