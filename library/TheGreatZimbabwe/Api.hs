@@ -73,11 +73,14 @@ routes pool = do
           Nothing                       -> status notFound404 *> json ()
           Just (Left  err             ) -> status forbidden403 *> json err
           Just (Right (game, gameView)) -> do
-            when (not preview) $ void $ runDB pool $ Command.insertGameCommand
-              (entityKey game)
-              (entityKey user)
-              now
-              command
+            -- TODO:
+            -- validatePlayerOwnsCommand c
+
+            when (not preview) $ do
+              void $ runDB pool $ Command.insertGameCommand (entityKey game)
+                                                            (entityKey user)
+                                                            now
+                                                            command
             status ok200 *> json gameView
 
   Scotty.post "/new-game" $ do

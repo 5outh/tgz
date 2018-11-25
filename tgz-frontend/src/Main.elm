@@ -23,7 +23,7 @@ type alias Model =
 
 getGame =
     Http.get
-        "http://localhost:8000/game/3"
+        "http://localhost:8000/game/9"
         decodeGameView
 
 

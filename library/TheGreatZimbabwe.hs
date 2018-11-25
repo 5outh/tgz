@@ -12,22 +12,27 @@ module TheGreatZimbabwe where
 import           Prelude                            hiding (round)
 
 import           Control.Lens
-import           Control.Monad
 import           Data.List
 import qualified Data.Map.Strict                    as M
 import           Data.Maybe
 import           Numeric.Natural
+import           Safe
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
 import           TheGreatZimbabwe.Types.GameCommand
 import           TheGreatZimbabwe.Validation
 
+-- TODO: How to handle game commands issued by the game itself? For example,
+-- income after each phase should be recorded.
+
 -- Run a game command
 
 runGameCommand :: Game -> GameCommand -> Either GameError Game
 runGameCommand game = \case
-  ChooseEmpire e playerId -> getPlayerAction (chooseEmpire e playerId game)
+  -- TODO: When to break out of presetup?
+  ChooseEmpire e playerId ->
+    handleFinishPreSetup (chooseEmpire e playerId game)
   PlaceStartingMonument location playerId ->
     getPlayerAction (placeStartingMonument location playerId game)
 
@@ -43,13 +48,8 @@ runGameCommands game commands = foldl' go (Right game) commands
 
 cyclePlayers :: Game -> Either GameError Game
 cyclePlayers game = do
-  mPlayer <- nextPlayer
-  case mPlayer of
-    Just player ->
-      pure
-        $  game
-        <> (mempty & round .~ mempty { roundCurrentPlayer = Just player })
-    Nothing -> newRound game
+  player <- nextPlayer
+  pure $ game <> (mempty & round .~ mempty { roundCurrentPlayer = Just player })
  where
   players' :: [PlayerId]
   players'   = game ^. round . players
@@ -59,8 +59,8 @@ cyclePlayers game = do
     Just playerId -> case elemIndex playerId players' of
       Nothing -> internalError "Current player was not found in game."
       Just i  -> if i < length players' - 1
-        then Right (Just $ players' !! i)
-        else Right Nothing -- signals end of turn
+        then Right (players' !! succ i)
+        else Right (head players')
 
 newRound :: Game -> Either GameError Game
 newRound _ = internalError "cannot start a new round yet"
@@ -77,10 +77,28 @@ chooseEmpire empire' playerId game = PlayerAction $ do
       withEmpire    = mempty { playerEmpire = Just empire' }
 
   phaseIs PreSetup game
+  playerIs playerId game
+
   (empire' `elem` chosenEmpires)
     `impliesInvalid` "Empire has already been chosen."
 
   pure $ game <> withPlayer playerId withEmpire
+
+-- TODO: Move this logic into 'newRound' below
+--
+handleFinishPreSetup :: PlayerAction 'PreSetup -> Either GameError Game
+handleFinishPreSetup (PlayerAction act) = do
+  game <- act
+  let players'    = M.elems (game ^. players)
+      firstPlayer = headMay (game ^. round . players)
+  -- Set phase = Setup
+  -- Set currentPlayer = first player
+  cyclePlayers $ if (all isJust $ map playerEmpire players')
+    then
+      game
+      & (round . currentPhase .~ Just Setup)
+      . (round . currentPlayer .~ firstPlayer)
+    else game
 
 -- * Setup
 
@@ -113,16 +131,9 @@ getPlayer playerId game = case M.lookup playerId (game ^. players) of
     invalidAction $ "Player with id " <> tshow playerId <> " does not exist."
   Just player -> pure player
 
-isPlayersTurn :: PlayerId -> Game -> Either GameError ()
-isPlayersTurn playerId game =
-  when (game ^. round . currentPlayer /= Just playerId)
-    $ invalidAction "It is not your turn."
-
--- TODO: How to cycle players in a foolproof way?
-
 bid :: Natural -> PlayerId -> Game -> PlayerAction 'GenerosityOfKings
 bid amount playerId game = PlayerAction $ do
-  isPlayersTurn playerId game
+  playerIs playerId game
 
   (game ^. round . currentPhase /= Just GenerosityOfKings)
     `impliesInvalid` "You can only take the bid action in the Generosity of Kings phase"
