@@ -15,7 +15,7 @@ phaseIs phase game =
   (currentPhase' /= Just phase)
     `impliesInvalid` (  "You can only perform that action in the "
                      <> tshow phase
-                     <> " ( current: "
+                     <> " phase. (current: "
                      <> tshow currentPhase'
                      <> ")"
                      )

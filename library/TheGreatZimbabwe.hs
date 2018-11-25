@@ -16,7 +16,6 @@ import           Data.List
 import qualified Data.Map.Strict                    as M
 import           Data.Maybe
 import           Numeric.Natural
-import           Safe
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
@@ -34,7 +33,7 @@ runGameCommand game = \case
   ChooseEmpire e playerId ->
     handleFinishPreSetup (chooseEmpire e playerId game)
   PlaceStartingMonument location playerId ->
-    getPlayerAction (placeStartingMonument location playerId game)
+    handleFinishSetup (placeStartingMonument location playerId game)
 
 runGameCommands :: Game -> [GameCommand] -> Either GameError Game
 runGameCommands game commands = foldl' go (Right game) commands
@@ -76,51 +75,62 @@ chooseEmpire empire' playerId game = PlayerAction $ do
   let chosenEmpires = mapMaybe playerEmpire $ M.elems $ game ^. players
       withEmpire    = mempty { playerEmpire = Just empire' }
 
-  phaseIs PreSetup game
   playerIs playerId game
+  phaseIs PreSetup game
 
   (empire' `elem` chosenEmpires)
     `impliesInvalid` "Empire has already been chosen."
 
   pure $ game <> withPlayer playerId withEmpire
 
--- TODO: Move this logic into 'newRound' below
---
 handleFinishPreSetup :: PlayerAction 'PreSetup -> Either GameError Game
 handleFinishPreSetup (PlayerAction act) = do
   game <- act
-  let players'    = M.elems (game ^. players)
-      firstPlayer = headMay (game ^. round . players)
-  -- Set phase = Setup
-  -- Set currentPlayer = first player
+  let players' = M.elems (game ^. players)
   cyclePlayers $ if (all isJust $ map playerEmpire players')
-    then
-      game
-      & (round . currentPhase .~ Just Setup)
-      . (round . currentPlayer .~ firstPlayer)
+    then game & (round . currentPhase .~ Just Setup)
     else game
 
 -- * Setup
 
 -- TODO: PlayerId should always match current player id
 
+handleFinishSetup :: PlayerAction 'Setup -> Either GameError Game
+handleFinishSetup (PlayerAction act) = do
+  game <- act
+  let players' = M.elems (game ^. players)
+  cyclePlayers $ if (all (not . M.null) $ map playerMonuments players')
+    then game & (round . currentPhase .~ Just GenerosityOfKings)
+    else game
+
 placeStartingMonument :: Location -> PlayerId -> Game -> PlayerAction 'Setup
 placeStartingMonument location playerId game = PlayerAction $ do
+  playerIs playerId game
   phaseIs Setup game
   not isStartingMonument
     `impliesInvalid` (  "Cannot place monument at non-starting location: "
                      <> tshow location
                      )
-  -- TODO must be starting location
+  isTaken
+    `impliesInvalid` (  "Cannot place monument at location: "
+                     <> tshow location
+                     <> " because it has already been taken."
+                     )
+
   pure $ game <> changeSet
  where
   isStartingMonument = case (game ^. mapLayout) of
     Nothing -> False
     Just (MapLayout layout) ->
       M.lookup location layout == Just (Land StartingArea)
+  otherPlayers = filter ((/= playerId) . fst) $ M.toList (game ^. players)
+  otherPlayerMonumentLocations =
+    concatMap (M.keys . playerMonuments . snd) otherPlayers
+  isTaken              = location `elem` otherPlayerMonumentLocations
 
   withStartingMonument = mempty { playerMonuments = M.singleton location 1 }
   changeSet            = withPlayer playerId withStartingMonument
+
 -- * Generosity of Kings Phase
 
 data GenerosityOfKingsAction = Bid Natural | Pass

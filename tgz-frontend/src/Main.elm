@@ -28,7 +28,7 @@ getGame =
 
 
 
--- TODO: Apparrently this is bad?
+-- TODO: Apparently this is bad?
 
 
 send : msg -> Cmd msg
