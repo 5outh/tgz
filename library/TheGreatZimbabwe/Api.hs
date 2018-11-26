@@ -46,6 +46,14 @@ api = do
 
 routes :: ConnectionPool -> ScottyM ()
 routes pool = do
+  Scotty.get "/user/:username" $ do
+    addHeader "Access-Control-Allow-Origin" "*"
+    usernameParam <- param @Text "username"
+    mUser         <- runDB pool $ getBy (User.UniqueUsername usernameParam)
+    case mUser of
+      Nothing   -> status notFound404 *> json ()
+      Just user -> json $ User.toView user
+
   Scotty.get "/game/:id" $ do
     addHeader "Access-Control-Allow-Origin" "*"
     gameId :: Game.GameId <- toSqlKey <$> param @Int64 "id"

@@ -16,6 +16,8 @@ import           Data.Text                   (Text)
 import           Database.Persist
 import           Database.Persist.Postgresql
 import           Database.Persist.TH
+import           Elm.Derive
+import           TheGreatZimbabwe.Aeson
 import           TheGreatZimbabwe.Types
 
 -- TODO add password
@@ -39,3 +41,18 @@ toPlayerInfoWithId (Entity playerId (User {..})) =
   ( PlayerId . fromIntegral $ fromSqlKey playerId
   , PlayerInfo (Username userUsername) userEmail
   )
+
+data UserView = UserView
+  { _id       :: Int
+  , _username :: Text
+  , _email    :: Text
+  }
+
+toView :: Entity User -> UserView
+toView (Entity userId (User {..})) = UserView {..}
+ where
+  _id       = fromIntegral $ fromSqlKey userId
+  _username = userUsername
+  _email    = userEmail
+
+deriveBoth (unPrefix "_") ''UserView
