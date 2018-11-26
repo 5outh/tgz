@@ -8,6 +8,7 @@ module ApiTypes exposing
     , Player
     , PlayerInfo
     , Square(..)
+    , UserView
     , arbitraryDict
     , decodeEmpire
     , decodeGame
@@ -19,8 +20,10 @@ module ApiTypes exposing
     , decodePlayer
     , decodePlayerInfo
     , decodeSquare
+    , decodeUserView
     , encodeGameCommand
     , encodeMapLayout
+    , encodeUserView
     , intDict
     , showEmpire
     , showGod
@@ -486,3 +489,27 @@ arbitraryDict readString decoder =
                 (catMaybes (List.map parseTuple list))
     in
     Decode.map transform (Decode.keyValuePairs decoder)
+
+
+type alias UserView =
+    { id : Int
+    , username : String
+    , email : String
+    }
+
+
+decodeUserView : Decode.Decoder UserView
+decodeUserView =
+    Decode.succeed (\pid pusername pemail -> { id = pid, username = pusername, email = pemail })
+        |> required "id" Decode.int
+        |> required "username" Decode.string
+        |> required "email" Decode.string
+
+
+encodeUserView : UserView -> Value
+encodeUserView val =
+    Encode.object
+        [ ( "id", Encode.int val.id )
+        , ( "username", Encode.string val.username )
+        , ( "email", Encode.string val.email )
+        ]

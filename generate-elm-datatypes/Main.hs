@@ -7,6 +7,7 @@ import           Elm.Derive
 import           Elm.Module
 import           System.IO                          (writeFile)
 import qualified TheGreatZimbabwe.Database.Game     as DB
+import qualified TheGreatZimbabwe.Database.User     as DB
 import           TheGreatZimbabwe.Types
 import           TheGreatZimbabwe.Types.GameCommand
 
@@ -37,4 +38,5 @@ main = do
     , DefineElm (Proxy :: Proxy GameCommand)
     -- Database reps
     , DefineElm (Proxy :: Proxy DB.GameView)
+    , DefineElm (Proxy :: Proxy DB.UserView)
     ]

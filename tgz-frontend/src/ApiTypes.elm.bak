@@ -538,3 +538,26 @@ jsonEncGameView  val =
    , ("state", jsonEncGame val.state)
    ]
 
+
+
+type alias UserView  =
+   { id: Int
+   , username: String
+   , email: String
+   }
+
+jsonDecUserView : Json.Decode.Decoder ( UserView )
+jsonDecUserView =
+   Json.Decode.succeed (\pid pusername pemail -> {id = pid, username = pusername, email = pemail})
+   |> required "id" (Json.Decode.int)
+   |> required "username" (Json.Decode.string)
+   |> required "email" (Json.Decode.string)
+
+jsonEncUserView : UserView -> Value
+jsonEncUserView  val =
+   Json.Encode.object
+   [ ("id", Json.Encode.int val.id)
+   , ("username", Json.Encode.string val.username)
+   , ("email", Json.Encode.string val.email)
+   ]
+

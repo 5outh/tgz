@@ -22,12 +22,14 @@ import Url.Parser exposing ((</>), Parser, int, map, oneOf, parse, s, string)
 
 type Route
     = Game Int
+    | GamePlayer Int String
 
 
 routes : Parser (Route -> a) a
 routes =
     oneOf
         [ map Game (s "game" </> int)
+        , map GamePlayer (s "game" </> int </> s "username" </> string)
         ]
 
 
@@ -75,6 +77,9 @@ init flags url key =
             Cmd.none
 
         Just (Game gameId) ->
+            Http.send GotGame (getGame gameId)
+
+        Just (GamePlayer gameId playerId) ->
             Http.send GotGame (getGame gameId)
     )
 
@@ -165,8 +170,13 @@ renderGame game =
 
 listPlayers : List Player -> Html Msg
 listPlayers players =
+    ul [] (List.map renderPlayer players)
+
+
+renderPlayer : Player -> Html Msg
+renderPlayer player =
     let
-        showPlayerEmpire player =
+        playerEmpire =
             case player.empire of
                 Nothing ->
                     "N/A"
@@ -174,27 +184,24 @@ listPlayers players =
                 Just empire ->
                     ApiTypes.showEmpire empire
 
-        showPlayerGod player =
+        playerGod =
             case player.god of
                 Nothing ->
                     "N/A"
 
                 Just god ->
                     ApiTypes.showGod god
-
-        renderPlayer player =
-            li []
-                [ div []
-                    [ h3 [] [ text player.info.username ]
-                    , p [] [ text ("Empire: " ++ showPlayerEmpire player) ]
-                    , p [] [ text ("God: " ++ showPlayerGod player) ]
-                    , p [] [ text ("VR: " ++ String.fromInt player.victoryRequirement) ]
-                    , p [] [ text ("VP: " ++ String.fromInt player.victoryPoints) ]
-                    , p [] [ text ("🐄: " ++ String.fromInt player.cattle) ]
-                    ]
-                ]
     in
-    ul [] (List.map renderPlayer players)
+    li []
+        [ div []
+            [ h3 [] [ text player.info.username ]
+            , p [] [ text ("Empire: " ++ playerEmpire) ]
+            , p [] [ text ("God: " ++ playerGod) ]
+            , p [] [ text ("VR: " ++ String.fromInt player.victoryRequirement) ]
+            , p [] [ text ("VP: " ++ String.fromInt player.victoryPoints) ]
+            , p [] [ text ("🐄: " ++ String.fromInt player.cattle) ]
+            ]
+        ]
 
 
 
