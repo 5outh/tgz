@@ -1,6 +1,30 @@
-module ApiTypes exposing (Empire(..), Game, GameView, God(..), Land(..), MapLayout, Player, PlayerInfo, Square(..), arbitraryDict, decodeEmpire, decodeGame, decodeGameView, decodeGod, decodeLand, decodeMapLayout, decodePlayer, decodePlayerInfo, decodeSquare, encodeMapLayout, intDict, showEmpire, showGod)
-
--- The following module comes from bartavelle/json-helpers
+module ApiTypes exposing
+    ( Empire(..)
+    , Game
+    , GameView
+    , God(..)
+    , Land(..)
+    , MapLayout
+    , Player
+    , PlayerInfo
+    , Square(..)
+    , arbitraryDict
+    , decodeEmpire
+    , decodeGame
+    , decodeGameCommand
+    , decodeGameView
+    , decodeGod
+    , decodeLand
+    , decodeMapLayout
+    , decodePlayer
+    , decodePlayerInfo
+    , decodeSquare
+    , encodeGameCommand
+    , encodeMapLayout
+    , intDict
+    , showEmpire
+    , showGod
+    )
 
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
@@ -43,10 +67,11 @@ type alias Player =
     , victoryPoints : Int
     , empire : Maybe Empire
     , cattle : Int
+    , monuments : Dict Location Int
 
-    --, monuments: Dict Location Int TODO
     --, craftsmen: Dict Location Craftsman TODO
-    --, technologyCards: Dict TechnologyCard Int TODO
+    --, technologyCards: List (TechnologyCard, Int) TODO
+    -- ^ note: TechnologyCard isn't comparable, so we have to decode to a list
     --, specialists: List Specialist TODO
     , god : Maybe God
     }
@@ -54,12 +79,23 @@ type alias Player =
 
 decodePlayer : Decoder Player
 decodePlayer =
-    Decode.succeed (\a b c d e f -> { info = a, victoryRequirement = b, victoryPoints = c, empire = d, cattle = e, god = f })
+    Decode.succeed
+        (\a b c d e f g ->
+            { info = a
+            , victoryRequirement = b
+            , victoryPoints = c
+            , empire = d
+            , cattle = e
+            , monuments = f
+            , god = g
+            }
+        )
         |> required "info" decodePlayerInfo
         |> required "victory_requirement" Decode.int
         |> required "victory_points" Decode.int
         |> required "empire" (Decode.maybe decodeEmpire)
         |> required "cattle" Decode.int
+        |> required "monuments" decodeMonuments
         |> required "god" (Decode.maybe decodeGod)
 
 
@@ -70,6 +106,25 @@ decodeEmpire =
             Dict.fromList [ ( "Kilwa", Kilwa ), ( "Mutapa", Mutapa ), ( "Zulu", Zulu ), ( "Lozi", Lozi ), ( "Mapungubwe", Mapungubwe ) ]
     in
     decodeSumUnaries "Empire" jsonDecDictEmpire
+
+
+encodeEmpire : Empire -> Value
+encodeEmpire val =
+    case val of
+        Kilwa ->
+            Encode.string "Kilwa"
+
+        Mutapa ->
+            Encode.string "Mutapa"
+
+        Zulu ->
+            Encode.string "Zulu"
+
+        Lozi ->
+            Encode.string "Lozi"
+
+        Mapungubwe ->
+            Encode.string "Mapungubwe"
 
 
 decodeGod : Decoder God
@@ -323,11 +378,76 @@ decodeMapLayout =
         )
 
 
+decodeMonuments : Decoder (Dict Location Int)
+decodeMonuments =
+    Decode.map
+        Dict.fromList
+        (Decode.list
+            (Decode.map2 tuple2
+                (Decode.index 0 decodeLocation)
+                (Decode.index 1 Decode.int)
+            )
+        )
+
+
 encodeMapLayout : MapLayout -> Value
 encodeMapLayout val =
     Encode.list
         (\( v1, v2 ) -> Encode.list identity [ encodeLocation v1, encodeSquare v2 ])
         (Dict.toList val)
+
+
+type GameCommand
+    = ChooseEmpire Empire Int
+    | PlaceStartingMonument Location Int
+
+
+decodeGameCommand : Decode.Decoder GameCommand
+decodeGameCommand =
+    let
+        jsonDecDictGameCommand =
+            Dict.fromList
+                [ ( "ChooseEmpire"
+                  , Decode.lazy
+                        (\_ ->
+                            Decode.map2
+                                ChooseEmpire
+                                (Decode.index 0 decodeEmpire)
+                                (Decode.index 1 Decode.int)
+                        )
+                  )
+                , ( "PlaceStartingMonument"
+                  , Decode.lazy
+                        (\_ ->
+                            Decode.map2
+                                PlaceStartingMonument
+                                (Decode.index 0 decodeLocation)
+                                (Decode.index 1 Decode.int)
+                        )
+                  )
+                ]
+    in
+    decodeSumObjectWithSingleField "GameCommand" jsonDecDictGameCommand
+
+
+encodeGameCommand : GameCommand -> Value
+encodeGameCommand val =
+    let
+        keyval v =
+            case v of
+                ChooseEmpire v1 v2 ->
+                    ( "ChooseEmpire"
+                    , encodeValue
+                        (Encode.list identity [ encodeEmpire v1, Encode.int v2 ])
+                    )
+
+                PlaceStartingMonument v1 v2 ->
+                    ( "PlaceStartingMonument"
+                    , encodeValue
+                        (Encode.list identity [ encodeLocation v1, Encode.int v2 ])
+                    )
+    in
+    encodeSumObjectWithSingleField keyval val
 
 
 

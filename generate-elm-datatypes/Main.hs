@@ -5,9 +5,10 @@ module Main where
 import           Data.Proxy
 import           Elm.Derive
 import           Elm.Module
-import           System.IO                      (writeFile)
-import qualified TheGreatZimbabwe.Database.Game as DB
+import           System.IO                          (writeFile)
+import qualified TheGreatZimbabwe.Database.Game     as DB
 import           TheGreatZimbabwe.Types
+import           TheGreatZimbabwe.Types.GameCommand
 
 main :: IO ()
 main = do
@@ -33,6 +34,7 @@ main = do
     , DefineElm (Proxy :: Proxy Phase)
     , DefineElm (Proxy :: Proxy Round)
     , DefineElm (Proxy :: Proxy Game)
+    , DefineElm (Proxy :: Proxy GameCommand)
     -- Database reps
     , DefineElm (Proxy :: Proxy DB.GameView)
     ]

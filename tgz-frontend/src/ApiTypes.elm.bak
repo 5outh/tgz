@@ -71,11 +71,11 @@ jsonEncPlayerInfo  val =
 
 
 type Empire  =
-    Kilwa
-    | Mutapa
-    | Zulu
-    | Lozi
-    | Mapungubwe
+    Kilwa 
+    | Mutapa 
+    | Zulu 
+    | Lozi 
+    | Mapungubwe 
 
 jsonDecEmpire : Json.Decode.Decoder ( Empire )
 jsonDecEmpire = 
@@ -493,6 +493,27 @@ jsonEncGame  val =
    , ("craftsmen", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncCraftsman) v1,((Json.Encode.list jsonEncTechnologyCard)) v2])) val.craftsmen)
    , ("winner", (maybeEncode (jsonEncPlayerId)) val.winner)
    ]
+
+
+
+type GameCommand  =
+    ChooseEmpire Empire PlayerId
+    | PlaceStartingMonument Location PlayerId
+
+jsonDecGameCommand : Json.Decode.Decoder ( GameCommand )
+jsonDecGameCommand =
+    let jsonDecDictGameCommand = Dict.fromList
+            [ ("ChooseEmpire", Json.Decode.lazy (\_ -> Json.Decode.map2 ChooseEmpire (Json.Decode.index 0 (jsonDecEmpire)) (Json.Decode.index 1 (jsonDecPlayerId))))
+            , ("PlaceStartingMonument", Json.Decode.lazy (\_ -> Json.Decode.map2 PlaceStartingMonument (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (jsonDecPlayerId))))
+            ]
+    in  decodeSumObjectWithSingleField  "GameCommand" jsonDecDictGameCommand
+
+jsonEncGameCommand : GameCommand -> Value
+jsonEncGameCommand  val =
+    let keyval v = case v of
+                    ChooseEmpire v1 v2 -> ("ChooseEmpire", encodeValue (Json.Encode.list identity [jsonEncEmpire v1, jsonEncPlayerId v2]))
+                    PlaceStartingMonument v1 v2 -> ("PlaceStartingMonument", encodeValue (Json.Encode.list identity [jsonEncLocation v1, jsonEncPlayerId v2]))
+    in encodeSumObjectWithSingleField keyval val
 
 
 

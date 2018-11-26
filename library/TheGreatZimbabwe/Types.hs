@@ -402,6 +402,7 @@ instance Monoid Game where
 deriveBoth (unPrefix "game") ''Game
 makeLensesWith camelCaseFields ''Game
 
+-- TODO: I don't love this function, but it does the job for now.
 enrichPlayersVP :: Game -> Game
 enrichPlayersVP game = game & players %~ fmap enrichPlayerVP
 
