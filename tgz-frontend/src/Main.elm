@@ -13,6 +13,22 @@ import Http
 import Ports
 import Task
 import Url
+import Url.Parser exposing ((</>), Parser, int, map, oneOf, parse, s, string)
+
+
+
+---- ROUTING ----
+
+
+type Route
+    = Game Int
+
+
+routes : Parser (Route -> a) a
+routes =
+    oneOf
+        [ map Game (s "game" </> int)
+        ]
 
 
 
@@ -21,14 +37,15 @@ import Url
 
 type alias Model =
     { game : Fetch Http.Error GameView
+    , route : Maybe Route
     , key : Nav.Key
     , url : Url.Url
     }
 
 
-getGame =
+getGame gameId =
     Http.get
-        "http://localhost:8000/game/9"
+        ("http://localhost:8000/game/" ++ String.fromInt gameId)
         decodeGameView
 
 
@@ -44,11 +61,21 @@ send msg =
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
+    let
+        parsedRoute =
+            parse routes url
+    in
     ( { game = Loading
+      , route = parsedRoute
       , url = url
       , key = key
       }
-    , Http.send GotGame getGame
+    , case parsedRoute of
+        Nothing ->
+            Cmd.none
+
+        Just (Game gameId) ->
+            Http.send GotGame (getGame gameId)
     )
 
 
