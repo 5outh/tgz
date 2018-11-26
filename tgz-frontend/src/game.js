@@ -2,12 +2,8 @@ var canvas;
 var ctx;
 
 export function getGameCanvasContext() {
-  if (!canvas) {
-    canvas = document.getElementById('game-canvas');
-    if (canvas) {
-      ctx = canvas.getContext('2d');
-    }
-  }
+  canvas = document.getElementById('game-canvas');
+  ctx = canvas.getContext('2d');
 
   return ctx;
 }
@@ -22,7 +18,6 @@ function locationToCoordinates(size, location) {
 
 function locationText(location) {
   const {x, y} = location;
-  console.log(y+String(x));
   return y + String(x);
 }
 
@@ -51,16 +46,13 @@ export function renderMapLayout(mapLayout) {
         ctx.fillStyle = 'Linen';
         if (square.Land.StartingArea) {
           ctx.strokeStyle="Tan";
-          //ctx.fillStyle = 'SlateGray';
           ctx.fillRect(x, y, size, size)
           ctx.font = textSize + 'px monospace';
           ctx.fillText('\uD83C\uDFDA\uFE0F', textX, textY)
         }
 
         if (square.Land.BlankLand) {
-          // set this based off of square type
           ctx.strokeStyle="Tan";
-          //ctx.fillStyle = 'Linen';
           ctx.font = textSize + 'px monospace';
           ctx.fillRect(x, y, size, size)
         }
@@ -101,11 +93,9 @@ export function renderMapLayout(mapLayout) {
       }
 
       if (square.Water) {
-        // set this based off of square type
         ctx.strokeStyle="MidnightBlue";
         ctx.fillStyle = 'MidnightBlue';
         ctx.fillRect(x, y, size, size);
-        //ctx.strokeRect(x, y, size, size);
       }
     }
 

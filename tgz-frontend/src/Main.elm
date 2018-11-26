@@ -2,6 +2,7 @@ module Main exposing (Fetch(..), Model, Msg(..), getGame, init, listPlayers, mai
 
 import ApiTypes as ApiTypes exposing (GameView, MapLayout, Player, decodeGameView, encodeMapLayout, showEmpire)
 import Browser
+import Browser.Navigation as Nav
 import Canvas
 import CanvasColor as Color exposing (Color)
 import Dict
@@ -11,6 +12,7 @@ import Html.Keyed exposing (node)
 import Http
 import Ports
 import Task
+import Url
 
 
 
@@ -18,7 +20,10 @@ import Task
 
 
 type alias Model =
-    { game : Fetch Http.Error GameView }
+    { game : Fetch Http.Error GameView
+    , key : Nav.Key
+    , url : Url.Url
+    }
 
 
 getGame =
@@ -37,11 +42,13 @@ send msg =
         |> Task.perform identity
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( { game = Loading }
-    , send Load
-      -- Http.send GotGame getGame
+init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
+    ( { game = Loading
+      , url = url
+      , key = key
+      }
+    , Http.send GotGame getGame
     )
 
 
@@ -57,14 +64,23 @@ type Fetch err a
 
 type Msg
     = GotGame (Result Http.Error GameView)
-    | Load
+    | LinkClicked Browser.UrlRequest
+    | UrlChanged Url.Url
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Load ->
-            ( model, Http.send GotGame getGame )
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.key (Url.toString url) )
+
+                Browser.External href ->
+                    ( model, Nav.load href )
+
+        UrlChanged url ->
+            ( { model | url = url }, Cmd.none )
 
         GotGame result ->
             case result of
@@ -81,12 +97,18 @@ update msg model =
 ---- VIEW ----
 
 
-view : Model -> Html Msg
+gameCanvas : Html Msg
+gameCanvas =
+    node "canvas" [ id "game-canvas", height 720, width 720 ] []
+
+
+view : Model -> Browser.Document Msg
 view model =
     let
         emptyDiv title =
             div []
                 [ h1 [] [ text title ]
+                , gameCanvas
                 ]
 
         innards =
@@ -100,7 +122,7 @@ view model =
                 Success game ->
                     renderGame game
     in
-    innards
+    Browser.Document "The Great Zimbabwe" [ innards ]
 
 
 renderGame : GameView -> Html Msg
@@ -109,6 +131,7 @@ renderGame game =
         [ div []
             [ h1 [] [ text game.name ]
             ]
+        , gameCanvas
         , div [] [ listPlayers (Dict.values game.state.players) ]
         ]
 
@@ -153,9 +176,11 @@ listPlayers players =
 
 main : Program () Model Msg
 main =
-    Browser.element
+    Browser.application
         { view = view
-        , init = \_ -> init
+        , init = init
         , update = update
         , subscriptions = always Sub.none
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
         }
