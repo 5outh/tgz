@@ -7,8 +7,8 @@ import           GHC.Generics
 import           TheGreatZimbabwe.Types
 
 data GameCommand
-  = ChooseEmpire Empire PlayerId
-  | PlaceStartingMonument Location PlayerId
+  = ChooseEmpire Empire
+  | PlaceStartingMonument Location
   deriving (Generic, Show)
 
 deriveBoth defaultOptions ''GameCommand

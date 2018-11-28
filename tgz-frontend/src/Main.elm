@@ -1,6 +1,6 @@
 module Main exposing (Fetch(..), Model, Msg(..), getGame, init, listPlayers, main, update, view)
 
-import ApiTypes as ApiTypes exposing (GameView, MapLayout, Player, decodeGameView, encodeMapLayout, showEmpire)
+import ApiTypes as ApiTypes exposing (Empire(..), GameView, MapLayout, Player, decodeGameView, encodeMapLayout, showEmpire)
 import Browser
 import Browser.Navigation as Nav
 import Canvas
@@ -165,6 +165,9 @@ renderGame game =
             ]
         , gameCanvas
         , div [] [ listPlayers (Dict.values game.state.players) ]
+
+        -- TODO: Only if Pre-Setup phase, and add choices
+        , renderPreSetupActionBoard game
         ]
 
 
@@ -204,7 +207,44 @@ renderPlayer player =
         ]
 
 
+renderPreSetupActionBoard : GameView -> Html Msg
+renderPreSetupActionBoard game =
+    let
+        players =
+            Dict.values game.state.players
 
+        allEmpires =
+            [ Kilwa, Mutapa, Zulu, Lozi, Mapungubwe ]
+
+        catMaybes list =
+            case list of
+                Nothing :: rest ->
+                    catMaybes rest
+
+                (Just x) :: rest ->
+                    x :: catMaybes rest
+
+                [] ->
+                    []
+
+        takenEmpires =
+            catMaybes (List.map .empire players)
+
+        isAvailable x =
+            not (List.member x takenEmpires)
+
+        availableEmpires =
+            List.filter isAvailable allEmpires
+
+        empireElement empire =
+            li [] [ text (showEmpire empire) ]
+    in
+    ul [] (List.map empireElement availableEmpires)
+
+
+
+-- allow user to choose from list of empires
+-- only display those that have not yet been chosen
 ---- PROGRAM ----
 
 

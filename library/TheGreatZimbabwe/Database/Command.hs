@@ -11,6 +11,7 @@
 
 module TheGreatZimbabwe.Database.Command where
 
+import           Control.Arrow                      ((&&&))
 import           Control.Monad.IO.Class
 import           Data.Time                          (UTCTime)
 import           Database.Persist.Postgresql
@@ -28,10 +29,13 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     command      (JSONB GameCommand) -- TODO want JSONB
 |]
 
-fetchGameCommandsForGame :: MonadIO m => GameId -> SqlPersistT m [GameCommand]
+fetchGameCommandsForGame
+  :: MonadIO m => GameId -> SqlPersistT m [(UserId, GameCommand)]
 fetchGameCommandsForGame gameId = do
   commands <- selectList [CommandGameId ==. gameId] [Asc CommandCreatedAt]
-  pure $ map (unJSONB . commandCommand . entityVal) commands
+  let commandUserId'     = commandUserId . entityVal
+      commandGameCommand = unJSONB . commandCommand . entityVal
+  pure $ map (commandUserId' &&& commandGameCommand) commands
 
 insertGameCommand
   :: MonadIO m

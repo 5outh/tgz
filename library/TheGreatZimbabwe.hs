@@ -27,22 +27,22 @@ import           TheGreatZimbabwe.Validation
 
 -- Run a game command
 
-runGameCommand :: Game -> GameCommand -> Either GameError Game
-runGameCommand game = \case
+runGameCommand :: Game -> PlayerId -> GameCommand -> Either GameError Game
+runGameCommand game playerId = \case
   -- TODO: When to break out of presetup?
-  ChooseEmpire e playerId ->
-    handleFinishPreSetup (chooseEmpire e playerId game)
-  PlaceStartingMonument location playerId ->
+  ChooseEmpire e -> handleFinishPreSetup (chooseEmpire e playerId game)
+  PlaceStartingMonument location ->
     handleFinishSetup (placeStartingMonument location playerId game)
 
-runGameCommands :: Game -> [GameCommand] -> Either GameError Game
+runGameCommands :: Game -> [(PlayerId, GameCommand)] -> Either GameError Game
 runGameCommands game commands =
   enrichPlayersVP <$> foldl' go (Right game) commands
  where
-  go :: Either GameError Game -> GameCommand -> Either GameError Game
-  go eGame command = case eGame of
+  go
+    :: Either GameError Game -> (PlayerId, GameCommand) -> Either GameError Game
+  go eGame (playerId, command) = case eGame of
     Left  err   -> Left err
-    Right game' -> runGameCommand game' command
+    Right game' -> runGameCommand game' playerId command
 
 -- * Common
 

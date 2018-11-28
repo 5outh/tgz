@@ -10,6 +10,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
+import           Data.Bifunctor                     (first)
 import           Data.Pool
 import           Data.Text                          (Text)
 import qualified Data.Text.Lazy                     as TL
@@ -69,13 +70,14 @@ routes pool = do
     usernameParam <- param @Text "username"
     mUser         <- runDB pool $ getBy (User.UniqueUsername usernameParam)
     case mUser of
-      Nothing   -> status notFound404 *> json ()
-      Just user -> do
+      Nothing                     -> status notFound404 *> json ()
+      Just user@(Entity userId _) -> do
         preview <- flag "preview"
         command <- jsonData @GameCommand
         now     <- liftIO getCurrentTime
 
-        mGame   <- runDB pool $ fetchFullGameWith [command] gameId
+        mGame   <- runDB pool
+          $ fetchFullGameWith [(User.toPlayerId userId, command)] gameId
 
         case mGame of
           Nothing                       -> status notFound404 *> json ()
@@ -126,7 +128,7 @@ flag paramName = do
 --
 fetchFullGameWith
   :: MonadIO m
-  => [GameCommand]
+  => [(PlayerId, GameCommand)]
   -> Game.GameId
   -> SqlPersistT
        m
@@ -137,10 +139,11 @@ fetchFullGameWith cmds gameId = do
     Nothing   -> pure Nothing
     Just game -> do
       commands <- Command.fetchGameCommandsForGame (entityKey game)
+      let formattedCommands = map (first User.toPlayerId) commands
 
       let eGameState = runGameCommands
             (unJSONB $ Game.gameInitialState (entityVal game))
-            (commands ++ cmds)
+            (formattedCommands ++ cmds)
 
       pure $ Just $ case eGameState of
         Left  gameError -> Left gameError
