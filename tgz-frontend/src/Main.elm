@@ -1,4 +1,14 @@
-module Main exposing (Fetch(..), Model, Msg(..), getGame, init, listPlayers, main, update, view)
+module Main exposing
+    ( Fetch(..)
+    , Model
+    , Msg(..)
+    , getGame
+    , init
+    , listPlayers
+    , main
+    , update
+    , view
+    )
 
 import ApiTypes as ApiTypes exposing (Empire(..), GameView, MapLayout, Player, decodeGameView, encodeMapLayout, showEmpire)
 import Browser
@@ -49,16 +59,6 @@ getGame gameId =
     Http.get
         ("http://localhost:8000/game/" ++ String.fromInt gameId)
         decodeGameView
-
-
-
--- TODO: Apparently this is bad?
-
-
-send : msg -> Cmd msg
-send msg =
-    Task.succeed msg
-        |> Task.perform identity
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )

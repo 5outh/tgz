@@ -4,6 +4,7 @@ module ApiTypes exposing
     , GameView
     , God(..)
     , Land(..)
+    , Location
     , MapLayout
     , Player
     , PlayerInfo
@@ -12,7 +13,6 @@ module ApiTypes exposing
     , arbitraryDict
     , decodeEmpire
     , decodeGame
-    , decodeGameCommand
     , decodeGameView
     , decodeGod
     , decodeLand
@@ -21,7 +21,6 @@ module ApiTypes exposing
     , decodePlayerInfo
     , decodeSquare
     , decodeUserView
-    , encodeGameCommand
     , encodeMapLayout
     , encodeUserView
     , intDict
@@ -398,59 +397,6 @@ encodeMapLayout val =
     Encode.list
         (\( v1, v2 ) -> Encode.list identity [ encodeLocation v1, encodeSquare v2 ])
         (Dict.toList val)
-
-
-type GameCommand
-    = ChooseEmpire Empire Int
-    | PlaceStartingMonument Location Int
-
-
-decodeGameCommand : Decode.Decoder GameCommand
-decodeGameCommand =
-    let
-        jsonDecDictGameCommand =
-            Dict.fromList
-                [ ( "ChooseEmpire"
-                  , Decode.lazy
-                        (\_ ->
-                            Decode.map2
-                                ChooseEmpire
-                                (Decode.index 0 decodeEmpire)
-                                (Decode.index 1 Decode.int)
-                        )
-                  )
-                , ( "PlaceStartingMonument"
-                  , Decode.lazy
-                        (\_ ->
-                            Decode.map2
-                                PlaceStartingMonument
-                                (Decode.index 0 decodeLocation)
-                                (Decode.index 1 Decode.int)
-                        )
-                  )
-                ]
-    in
-    decodeSumObjectWithSingleField "GameCommand" jsonDecDictGameCommand
-
-
-encodeGameCommand : GameCommand -> Value
-encodeGameCommand val =
-    let
-        keyval v =
-            case v of
-                ChooseEmpire v1 v2 ->
-                    ( "ChooseEmpire"
-                    , encodeValue
-                        (Encode.list identity [ encodeEmpire v1, Encode.int v2 ])
-                    )
-
-                PlaceStartingMonument v1 v2 ->
-                    ( "PlaceStartingMonument"
-                    , encodeValue
-                        (Encode.list identity [ encodeLocation v1, Encode.int v2 ])
-                    )
-    in
-    encodeSumObjectWithSingleField keyval val
 
 
 
