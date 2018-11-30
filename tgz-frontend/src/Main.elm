@@ -52,6 +52,8 @@ routes =
 
 type alias Model =
     { game : Fetch Http.Error GameView
+    , gameView : Maybe GameView
+    , gameError : Maybe GameError
     , route : Maybe Route
     , key : Nav.Key
     , url : Url.Url
@@ -83,6 +85,8 @@ init flags url key =
             parse routes url
     in
     ( { game = Loading
+      , gameView = Nothing
+      , gameError = Nothing
       , route = parsedRoute
       , url = url
       , key = key
@@ -133,10 +137,20 @@ update msg model =
         GotGame result ->
             case result of
                 Err err ->
-                    ( { model | game = Failure err }, Cmd.none )
+                    ( { model
+                        | game = Failure err
+                        , gameError = decodeGameErrorFromBadStatusResponse err
+                      }
+                    , Cmd.none
+                    )
 
+                -- Getting an 'OK' response will clear out errors.
                 Ok gameView ->
-                    ( { model | game = Success gameView }
+                    ( { model
+                        | game = Success gameView
+                        , gameView = Just gameView
+                        , gameError = Nothing
+                      }
                     , Ports.renderMapLayout (encodeMapLayout gameView.state.mapLayout)
                     )
 
@@ -167,28 +181,39 @@ view model =
                 , gameCanvas
                 ]
 
-        innards =
+        loadingDiv =
             case model.game of
                 Loading ->
-                    emptyDiv "Loading"
+                    div [] [ text "Loading game..." ]
 
-                Failure err ->
-                    case decodeGameErrorFromBadStatusResponse err of
-                        Just (InvalidAction message) ->
-                            emptyDiv message
+                _ ->
+                    div [] []
 
-                        Just (InternalError message) ->
-                            emptyDiv message
+        errorDiv =
+            case model.gameError of
+                Nothing ->
+                    div [] []
 
-                        Nothing ->
-                            Debug.log
-                                (Debug.toString err)
-                                (emptyDiv "Game fetch failed!")
+                Just gameError ->
+                    case gameError of
+                        InternalError message ->
+                            div []
+                                [ text ("Server Error (not your fault!) " ++ message) ]
 
-                Success game ->
-                    renderGame game
+                        InvalidAction message ->
+                            div [] [ text message ]
+
+        -- NOTE: This is extremely finnicky. Be careful modifying this, or
+        -- the game may completely disappear from the screen.
+        gameDiv =
+            case model.gameView of
+                Just gameView ->
+                    renderGame gameView
+
+                _ ->
+                    emptyDiv "Loading..."
     in
-    Browser.Document "The Great Zimbabwe" [ innards ]
+    Browser.Document "The Great Zimbabwe" [ loadingDiv, errorDiv, gameDiv ]
 
 
 renderGame : GameView -> Html Msg
