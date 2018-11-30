@@ -64,7 +64,13 @@ routes pool = do
       Just (Left  err          ) -> status forbidden403 *> json err
       Just (Right (_, gameView)) -> status ok200 *> json gameView
 
+  Scotty.options "/game/:gameId/player/:username/command" $ do
+    addHeader "Access-Control-Allow-Origin"  "*"
+    addHeader "Access-Control-Allow-Headers" "Content-Type"
+    status ok200 *> text ""
+
   Scotty.post "/game/:gameId/player/:username/command" $ do
+    addHeader "Access-Control-Allow-Origin" "*"
     gameId        <- toSqlKey . fromIntegral <$> param @Int "gameId"
     -- TODO: mkUsername
     usernameParam <- param @Text "username"

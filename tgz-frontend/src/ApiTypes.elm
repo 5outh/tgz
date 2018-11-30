@@ -21,6 +21,8 @@ module ApiTypes exposing
     , decodePlayerInfo
     , decodeSquare
     , decodeUserView
+    , encodeEmpire
+    , encodeLocation
     , encodeMapLayout
     , encodeUserView
     , intDict

@@ -16,8 +16,11 @@ import Browser.Navigation as Nav
 import Canvas
 import CanvasColor as Color exposing (Color)
 import Dict
-import Html exposing (Html, canvas, div, h1, h3, img, li, p, text, ul)
+import GameCommand exposing (GameCommand(..), encodeGameCommand)
+import GameError exposing (GameError(..), decodeGameErrorFromBadStatusResponse)
+import Html exposing (Html, button, canvas, div, h1, h3, img, li, p, text, ul)
 import Html.Attributes exposing (height, id, src, style, width)
+import Html.Events exposing (onClick)
 import Html.Keyed exposing (node)
 import Http
 import Ports
@@ -61,6 +64,18 @@ getGame gameId =
         decodeGameView
 
 
+issueCommand gameId username command =
+    Http.post
+        ("http://localhost:8000/game/"
+            ++ String.fromInt gameId
+            ++ "/player/"
+            ++ username
+            ++ "/command"
+        )
+        (Http.jsonBody (encodeGameCommand command))
+        decodeGameView
+
+
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
@@ -98,6 +113,7 @@ type Msg
     = GotGame (Result Http.Error GameView)
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
+    | IssueGameCommand GameCommand
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -124,6 +140,14 @@ update msg model =
                     , Ports.renderMapLayout (encodeMapLayout gameView.state.mapLayout)
                     )
 
+        IssueGameCommand command ->
+            case model.route of
+                Just (GamePlayer gameId username) ->
+                    ( model, Http.send GotGame (issueCommand gameId username command) )
+
+                _ ->
+                    ( model, Cmd.none )
+
 
 
 ---- VIEW ----
@@ -149,7 +173,17 @@ view model =
                     emptyDiv "Loading"
 
                 Failure err ->
-                    emptyDiv "Game fetch failed!"
+                    case decodeGameErrorFromBadStatusResponse err of
+                        Just (InvalidAction message) ->
+                            emptyDiv message
+
+                        Just (InternalError message) ->
+                            emptyDiv message
+
+                        Nothing ->
+                            Debug.log
+                                (Debug.toString err)
+                                (emptyDiv "Game fetch failed!")
 
                 Success game ->
                     renderGame game
@@ -237,14 +271,15 @@ renderPreSetupActionBoard game =
             List.filter isAvailable allEmpires
 
         empireElement empire =
-            li [] [ text (showEmpire empire) ]
+            li []
+                [ button [ onClick (IssueGameCommand (ChooseEmpire empire)) ]
+                    [ text (showEmpire empire) ]
+                ]
     in
     ul [] (List.map empireElement availableEmpires)
 
 
 
--- allow user to choose from list of empires
--- only display those that have not yet been chosen
 ---- PROGRAM ----
 
 

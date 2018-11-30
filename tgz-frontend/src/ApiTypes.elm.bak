@@ -497,22 +497,43 @@ jsonEncGame  val =
 
 
 type GameCommand  =
-    ChooseEmpire Empire PlayerId
-    | PlaceStartingMonument Location PlayerId
+    ChooseEmpire Empire
+    | PlaceStartingMonument Location
 
 jsonDecGameCommand : Json.Decode.Decoder ( GameCommand )
 jsonDecGameCommand =
     let jsonDecDictGameCommand = Dict.fromList
-            [ ("ChooseEmpire", Json.Decode.lazy (\_ -> Json.Decode.map2 ChooseEmpire (Json.Decode.index 0 (jsonDecEmpire)) (Json.Decode.index 1 (jsonDecPlayerId))))
-            , ("PlaceStartingMonument", Json.Decode.lazy (\_ -> Json.Decode.map2 PlaceStartingMonument (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (jsonDecPlayerId))))
+            [ ("ChooseEmpire", Json.Decode.lazy (\_ -> Json.Decode.map ChooseEmpire (jsonDecEmpire)))
+            , ("PlaceStartingMonument", Json.Decode.lazy (\_ -> Json.Decode.map PlaceStartingMonument (jsonDecLocation)))
             ]
     in  decodeSumObjectWithSingleField  "GameCommand" jsonDecDictGameCommand
 
 jsonEncGameCommand : GameCommand -> Value
 jsonEncGameCommand  val =
     let keyval v = case v of
-                    ChooseEmpire v1 v2 -> ("ChooseEmpire", encodeValue (Json.Encode.list identity [jsonEncEmpire v1, jsonEncPlayerId v2]))
-                    PlaceStartingMonument v1 v2 -> ("PlaceStartingMonument", encodeValue (Json.Encode.list identity [jsonEncLocation v1, jsonEncPlayerId v2]))
+                    ChooseEmpire v1 -> ("ChooseEmpire", encodeValue (jsonEncEmpire v1))
+                    PlaceStartingMonument v1 -> ("PlaceStartingMonument", encodeValue (jsonEncLocation v1))
+    in encodeSumObjectWithSingleField keyval val
+
+
+
+type GameError  =
+    InvalidAction String
+    | InternalError String
+
+jsonDecGameError : Json.Decode.Decoder ( GameError )
+jsonDecGameError =
+    let jsonDecDictGameError = Dict.fromList
+            [ ("InvalidAction", Json.Decode.lazy (\_ -> Json.Decode.map InvalidAction (Json.Decode.string)))
+            , ("InternalError", Json.Decode.lazy (\_ -> Json.Decode.map InternalError (Json.Decode.string)))
+            ]
+    in  decodeSumObjectWithSingleField  "GameError" jsonDecDictGameError
+
+jsonEncGameError : GameError -> Value
+jsonEncGameError  val =
+    let keyval v = case v of
+                    InvalidAction v1 -> ("InvalidAction", encodeValue (Json.Encode.string v1))
+                    InternalError v1 -> ("InternalError", encodeValue (Json.Encode.string v1))
     in encodeSumObjectWithSingleField keyval val
 
 

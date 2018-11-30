@@ -1,5 +1,6 @@
 module GameCommand exposing
     ( GameCommand(..)
+    , encodeGameCommand
     , parseChooseEmpire
     , parseEmpire
     , parseGameCommand
@@ -7,8 +8,10 @@ module GameCommand exposing
     , parsePlaceStartingMonument
     )
 
-import Json.Encode
-import ApiTypes exposing (Empire(..), Location)
+import ApiTypes exposing (Empire(..), Location, encodeEmpire, encodeLocation)
+import Json.Decode
+import Json.Encode exposing (Value)
+import Json.Helpers exposing (..)
 import Parser
     exposing
         ( (|.)
@@ -84,3 +87,21 @@ parsePlaceStartingMonument =
         |. spaces
         |= parseLocation
         |. chompUntilEndOr "\n"
+
+
+
+-- * Auto-generated
+
+
+encodeGameCommand : GameCommand -> Value
+encodeGameCommand val =
+    let
+        keyval v =
+            case v of
+                ChooseEmpire v1 ->
+                    ( "ChooseEmpire", encodeValue (encodeEmpire v1) )
+
+                PlaceStartingMonument v1 ->
+                    ( "PlaceStartingMonument", encodeValue (encodeLocation v1) )
+    in
+    encodeSumObjectWithSingleField keyval val
