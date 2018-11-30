@@ -16,17 +16,25 @@ import Browser.Navigation as Nav
 import Canvas
 import CanvasColor as Color exposing (Color)
 import Dict
-import GameCommand exposing (GameCommand(..), encodeGameCommand)
+import GameCommand exposing (GameCommand(..), encodeGameCommand, parseGameCommand)
 import GameError exposing (GameError(..), decodeGameErrorFromBadStatusResponse)
-import Html exposing (Html, button, canvas, div, h1, h3, img, li, p, text, ul)
-import Html.Attributes exposing (height, id, src, style, width)
-import Html.Events exposing (onClick)
+import Html exposing (Attribute, Html, button, canvas, div, h1, h3, img, input, li, p, span, text, ul)
+import Html.Attributes exposing (height, id, placeholder, src, style, value, width)
+import Html.Events exposing (keyCode, on, onClick, onInput)
 import Html.Keyed exposing (node)
 import Http
+import Json.Decode as Json
+import Parser
 import Ports
 import Task
+import Tuple exposing (first, second)
 import Url
 import Url.Parser exposing ((</>), Parser, int, map, oneOf, parse, s, string)
+
+
+onKeyUp : (Int -> msg) -> Attribute msg
+onKeyUp tagger =
+    on "keyup" (Json.map tagger keyCode)
 
 
 
@@ -54,6 +62,7 @@ type alias Model =
     { game : Fetch Http.Error GameView
     , gameView : Maybe GameView
     , gameError : Maybe GameError
+    , playerCommand : ( String, Maybe GameCommand )
     , route : Maybe Route
     , key : Nav.Key
     , url : Url.Url
@@ -87,6 +96,7 @@ init flags url key =
     ( { game = Loading
       , gameView = Nothing
       , gameError = Nothing
+      , playerCommand = ( "", Nothing )
       , route = parsedRoute
       , url = url
       , key = key
@@ -114,15 +124,20 @@ type Fetch err a
 
 
 type Msg
-    = GotGame (Result Http.Error GameView)
+    = Noop
+    | GotGame (Result Http.Error GameView)
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | IssueGameCommand GameCommand
+    | UpdateCommand String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Noop ->
+            ( model, Cmd.none )
+
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
@@ -161,6 +176,14 @@ update msg model =
 
                 _ ->
                     ( model, Cmd.none )
+
+        UpdateCommand commandString ->
+            case Parser.run parseGameCommand commandString of
+                Ok cmd ->
+                    ( { model | playerCommand = ( commandString, Just cmd ) }, Cmd.none )
+
+                Err _ ->
+                    ( { model | playerCommand = ( commandString, Nothing ) }, Cmd.none )
 
 
 
@@ -213,7 +236,11 @@ view model =
                 _ ->
                     emptyDiv "Loading..."
     in
-    Browser.Document "The Great Zimbabwe" [ loadingDiv, errorDiv, gameDiv ]
+    Browser.Document "The Great Zimbabwe" [ loadingDiv, errorDiv, gameDiv, renderControlPanel model ]
+
+
+
+-- TODO: refactor to place control panel within
 
 
 renderGame : GameView -> Html Msg
@@ -266,6 +293,39 @@ renderPlayer player =
         ]
 
 
+renderControlPanel : Model -> Html Msg
+renderControlPanel model =
+    let
+        parsedCommand =
+            second model.playerCommand
+
+        issueCommandIfPossible cmd =
+            case cmd of
+                Nothing ->
+                    Noop
+
+                Just gameCommand ->
+                    IssueGameCommand gameCommand
+    in
+    div []
+        [ input
+            [ placeholder "Enter command"
+            , value (first model.playerCommand)
+            , onInput UpdateCommand
+            , onKeyUp
+                (\i ->
+                    if i == 13 then
+                        issueCommandIfPossible parsedCommand
+
+                    else
+                        Noop
+                )
+            ]
+            []
+        , div [] [ text <| Debug.toString (second model.playerCommand) ]
+        ]
+
+
 renderPreSetupActionBoard : GameView -> Html Msg
 renderPreSetupActionBoard game =
     let
@@ -296,12 +356,12 @@ renderPreSetupActionBoard game =
             List.filter isAvailable allEmpires
 
         empireElement empire =
-            li []
+            div []
                 [ button [ onClick (IssueGameCommand (ChooseEmpire empire)) ]
                     [ text (showEmpire empire) ]
                 ]
     in
-    ul [] (List.map empireElement availableEmpires)
+    span [] (List.map empireElement availableEmpires)
 
 
 
