@@ -181,5 +181,7 @@ function empireColors(empire) {
       return ['white', 'black'];
     case 'Lozi':
       return ['black', 'white'];
+    default:
+      return ['black', 'white'];
   }
 }

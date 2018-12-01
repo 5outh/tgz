@@ -376,21 +376,27 @@ renderPlayer isCurrentPlayer player =
                 Just god ->
                     ApiTypes.showGod god
 
+        ( primary, secondary ) =
+            empireColors player.empire
+
         renderUsername =
             if isCurrentPlayer then
-                h2 [] [ text (player.info.username ++ " (current player)") ]
+                h3 [ style "color" primary ]
+                    [ text (player.info.username ++ " (current player)") ]
 
             else
-                h3 [] [ text player.info.username ]
+                h3 [ style "color" primary ] [ text player.info.username ]
     in
-    li []
+    div [ style "max-width" "400px" ]
         [ div []
             [ renderUsername
-            , p [] [ text ("Empire: " ++ playerEmpire) ]
-            , p [] [ text ("God: " ++ playerGod) ]
-            , p [] [ text ("VR: " ++ String.fromInt player.victoryRequirement) ]
-            , p [] [ text ("VP: " ++ String.fromInt player.victoryPoints) ]
-            , p [] [ text ("🐄: " ++ String.fromInt player.cattle) ]
+            , ul []
+                [ li [] [ text ("Empire: " ++ playerEmpire) ]
+                , li [] [ text ("God: " ++ playerGod) ]
+                , li [] [ text ("VR: " ++ String.fromInt player.victoryRequirement) ]
+                , li [] [ text ("VP: " ++ String.fromInt player.victoryPoints) ]
+                , li [] [ text ("🐄: " ++ String.fromInt player.cattle) ]
+                ]
             ]
         ]
 
@@ -464,6 +470,30 @@ renderPreSetupActionBoard game =
                 ]
     in
     span [] (List.map empireElement availableEmpires)
+
+
+empireColors : Maybe Empire -> ( String, String )
+empireColors mEmpire =
+    case mEmpire of
+        Nothing ->
+            ( "black", "white" )
+
+        Just empire ->
+            case empire of
+                Kilwa ->
+                    ( "red", "white" )
+
+                Mutapa ->
+                    ( "yellow", "black" )
+
+                Zulu ->
+                    ( "green", "white" )
+
+                Mapungubwe ->
+                    ( "white", "black" )
+
+                Lozi ->
+                    ( "black", "white" )
 
 
 
