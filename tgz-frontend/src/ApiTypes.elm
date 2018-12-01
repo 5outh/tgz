@@ -3,6 +3,7 @@ module ApiTypes exposing
     , EmpirePlaque(..)
     , Game
     , GameView
+    , Phase(..)
     , GenerosityOfKingsState
     , God(..)
     , Land(..)

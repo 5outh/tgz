@@ -50,13 +50,14 @@ runGameCommands game commands = foldl' go (Right game) commands
 cyclePlayersWithPasses :: Game -> Either GameError Game
 cyclePlayersWithPasses game = do
   player <- nextPlayer (game ^. round . currentPlayer)
-  let setPlayer = mempty & round .~ mempty { roundCurrentPlayer = Just player }
+  let setCurrentPlayer =
+        mempty & round .~ mempty { roundCurrentPlayer = Just player }
       stepRound = mempty { gameStep = 1 }
 
   (length gokPlayersPassed == length players')
     `impliesError` "All players have passed"
 
-  pure $ game <> setPlayer <> stepRound
+  pure $ game <> setCurrentPlayer <> stepRound
  where
   players' :: [PlayerId]
   players'         = game ^. round . players
@@ -78,9 +79,10 @@ cyclePlayersWithPasses game = do
 cyclePlayers :: Game -> Either GameError Game
 cyclePlayers game = do
   player <- nextPlayer
-  let setPlayer = mempty & round .~ mempty { roundCurrentPlayer = Just player }
+  let setCurrentPlayer =
+        mempty & round .~ mempty { roundCurrentPlayer = Just player }
       stepRound = mempty { gameStep = 1 }
-  pure $ game <> setPlayer <> stepRound
+  pure $ game <> setCurrentPlayer <> stepRound
  where
   players' :: [PlayerId]
   players'   = game ^. round . players
@@ -150,17 +152,15 @@ handleFinishSetup (PlayerAction act) = do
     then setupGenerosityOfKings game
     else game
 
+playerWithShadipinyi :: Game -> Maybe (PlayerId, Player)
+playerWithShadipinyi game =
+  find ((== Just Shadipinyi) . playerGod . snd) $ M.toList (game ^. players)
 
 setupGenerosityOfKings :: Game -> Game
 setupGenerosityOfKings game =
   withPlayerOrder <> setPhase <> resetGenerosityOfKings
  where
-  setPhase = mempty & round . currentPhase .~ Just GenerosityOfKings
-
-  -- if anyone has Shadipinyi, he goes first.
-  playerHasShadipinyi =
-    any ((== Just Shadipinyi) . playerGod) $ M.elems (game ^. players)
-
+  setPhase           = mempty & round . currentPhase .~ Just GenerosityOfKings
   -- current order of players
   currentPlayerOrder = game ^. round . players
 
@@ -171,7 +171,7 @@ setupGenerosityOfKings game =
   playerPlaques =
     mapMaybe (fmap PlayerPlaque . playerEmpire . snd) playersOrderedByVR
 
-  empirePlaques = if playerHasShadipinyi
+  empirePlaques = if isJust (playerWithShadipinyi game)
     then ShadipinyiPlaque : playerPlaques
     else playerPlaques
 
@@ -191,11 +191,67 @@ handleFinishGenerosityOfKings (PlayerAction act) = do
   let gokPlayersPassed = game ^. round . generosityOfKingsState . playersPassed
       players'         = game ^. round . players
 
-  -- move to next phase if all players have passed
+  -- Move to next phase if all players have passed
   if length gokPlayersPassed == length players'
-    then
-      Right $ game <> mempty & round . currentPhase .~ Just ReligionAndCulture
-    else cyclePlayersWithPasses game -- TODO: setup main phase when all have passed
+    then endGenerosityOfKings game
+    else cyclePlayersWithPasses game
+
+endGenerosityOfKings :: Game -> Either GameError Game
+endGenerosityOfKings game = do
+  shadipinyiMod <- getShadipinyiMod
+  divvyCattle <- mconcat <$> traverse getDivvyCattle (M.keys $ game ^. players)
+
+  pure $ mconcat
+    [ withClearedGenerosityOfKings
+    , withReligionAndCulturePhase
+    , shadipinyiMod
+    , divvyCattle
+    ]
+ where
+  players' = game ^. players
+  -- N.B. This is destructive
+  withClearedGenerosityOfKings =
+    game & round . generosityOfKingsState .~ mempty
+
+  gok = game ^. round . generosityOfKingsState
+  withReligionAndCulturePhase =
+    mempty & round . currentPhase .~ Just ReligionAndCulture
+
+  nextRoundPlayerOrder = reverse (gok ^. playersPassed)
+
+  empireMap =
+    M.fromList (plaquesWithCattle (gok ^. cattlePool) (gok ^. plaques))
+
+  getShadipinyiMod = case playerWithShadipinyi game of
+    Nothing            -> Right mempty
+    Just (playerId, _) -> case M.lookup ShadipinyiPlaque empireMap of
+      Nothing -> internalError "Shadipinyi plaque not found"
+      Just cattleAmount ->
+        Right $ setPlayer playerId (mempty & cattle .~ cattleAmount)
+
+  getDivvyCattle playerId = do
+    player <- getPlayer playerId game
+    case playerEmpire player of
+      Nothing     -> internalError "Player not found."
+      Just empire -> case M.lookup (PlayerPlaque empire) empireMap of
+        Nothing -> internalError "Plaque not found"
+        Just cattleAmount ->
+          Right $ setPlayer playerId (mempty & cattle .~ cattleAmount)
+
+
+plaquesWithCattle totalCattle plaques =
+  let len       = length plaques
+
+      allGet    = fromIntegral totalCattle `div` len
+
+      remaining = fromIntegral totalCattle `mod` len
+      addOneTo n xs = case (n, xs) of
+        (0 , _            ) -> xs
+
+        (_ , []           ) -> []
+
+        (n0, (x, m) : rest) -> (x, m + 1) : addOneTo (n0 - 1) rest
+  in  addOneTo remaining (zip plaques (repeat allGet))
 
 placeStartingMonument :: Location -> PlayerId -> Game -> PlayerAction 'Setup
 placeStartingMonument location playerId game = PlayerAction $ do
@@ -282,12 +338,6 @@ pass playerId game = PlayerAction $ do
  where
   playersPassedLens :: Lens' Game [PlayerId]
   playersPassedLens = round . generosityOfKingsState . playersPassed
-
-clearSlate :: Game -> GameEvent 'GenerosityOfKings
-clearSlate = undefined
-
-endGenerosityOfKings :: Game -> GameEvent 'GenerosityOfKings
-endGenerosityOfKings = undefined
 
 -- * Religion and Culture Phase
 

@@ -14,6 +14,7 @@ import ApiTypes as ApiTypes
     exposing
         ( Empire(..)
         , EmpirePlaque(..)
+        , Phase(..)
         , GameView
         , GenerosityOfKingsState
         , Location
@@ -340,7 +341,9 @@ renderGame game =
             [ h1 [] [ text game.name ]
             ]
         , gameCanvas
-        , renderGenerosityOfKingsState game
+        , if game.state.round.currentPhase == Just GenerosityOfKings
+          then renderGenerosityOfKingsState game
+          else div [] []
         , div [] [ listPlayers currentPlayerUsername (trace <| Dict.values game.state.players) ]
 
         -- TODO: Only if Pre-Setup phase, and add choices

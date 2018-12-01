@@ -75,12 +75,12 @@ data Empire
   | Zulu -- Green
   | Lozi -- Black
   | Mapungubwe -- White
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
 deriveBoth (unPrefix "empire") ''Empire
 
 data EmpirePlaque = PlayerPlaque Empire | ShadipinyiPlaque
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 deriveBoth defaultOptions ''EmpirePlaque
 
