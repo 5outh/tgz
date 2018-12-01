@@ -30,6 +30,7 @@ import Browser.Navigation as Nav
 import Canvas
 import CanvasColor as Color exposing (Color)
 import Dict
+import Extra.Maybe exposing (..)
 import GameCommand exposing (GameCommand(..), encodeGameCommand, parseGameCommand)
 import GameError exposing (GameError(..), decodeGameErrorFromBadStatusResponse)
 import Html exposing (Attribute, Html, button, canvas, div, h1, h2, h3, img, input, li, p, span, text, ul)
@@ -339,7 +340,7 @@ renderGame game =
             [ h1 [] [ text game.name ]
             ]
         , gameCanvas
-        , renderGenerosityOfKingsState game.state.round.generosityOfKingsState
+        , renderGenerosityOfKingsState game
         , div [] [ listPlayers currentPlayerUsername (trace <| Dict.values game.state.players) ]
 
         -- TODO: Only if Pre-Setup phase, and add choices
@@ -475,9 +476,12 @@ renderPreSetupActionBoard game =
     span [] (List.map empireElement availableEmpires)
 
 
-renderGenerosityOfKingsState : GenerosityOfKingsState -> Html Msg
-renderGenerosityOfKingsState state =
+renderGenerosityOfKingsState : GameView -> Html Msg
+renderGenerosityOfKingsState gameView =
     let
+        state =
+            gameView.state.round.generosityOfKingsState
+
         plaquesWithCattle totalCattle plaques =
             let
                 len =
@@ -520,11 +524,25 @@ renderGenerosityOfKingsState state =
 
                 ( ShadipinyiPlaque, amount ) ->
                     div [] [ text ("Shadipinyi (God of Drunks) (" ++ String.fromInt amount ++ ")") ]
+
+        passedPlayers =
+            mapMaybe (\playerId -> getPlayerById playerId gameView) state.playersPassed
+
+        passedPlayersText =
+            "Players passed: "
+                ++ String.join ", " (List.map (.info >> .username) passedPlayers)
     in
     div []
         [ h3 [] [ text "Generosity of Kings" ]
+        , div [] [ text <| "Minimum bid: " ++ String.fromInt (1 + Maybe.withDefault 0 state.lastBid) ]
         , div [] (List.map renderPlaque (plaquesWithCattle state.cattlePool state.plaques))
+        , div [] [ text passedPlayersText ]
         ]
+
+
+getPlayerById : Int -> GameView -> Maybe Player
+getPlayerById playerId gameView =
+    Dict.get playerId gameView.state.players
 
 
 empireColors mEmpire =

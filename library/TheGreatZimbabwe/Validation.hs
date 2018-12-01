@@ -28,3 +28,6 @@ playerIs playerId game =
 
 impliesInvalid :: Bool -> T.Text -> Either GameError ()
 predicate `impliesInvalid` err = when predicate $ invalidAction err
+
+impliesError :: Bool -> T.Text -> Either GameError ()
+predicate `impliesError` err = when predicate $ internalError err

@@ -10,7 +10,7 @@ module GameCommand exposing
 
 import ApiTypes exposing (Empire(..), Location, encodeEmpire, encodeLocation)
 import Json.Decode
-import Json.Encode exposing (Value)
+import Json.Encode as Encode exposing (Value)
 import Json.Helpers exposing (..)
 import Parser
     exposing
@@ -30,6 +30,8 @@ import Parser
 type GameCommand
     = ChooseEmpire Empire
     | PlaceStartingMonument Location
+    | Bid Int
+    | Pass
 
 
 parseGameCommand : Parser GameCommand
@@ -37,6 +39,8 @@ parseGameCommand =
     oneOf
         [ parseChooseEmpire
         , parsePlaceStartingMonument
+        , parseBid
+        , parsePass
         ]
 
 
@@ -89,6 +93,24 @@ parsePlaceStartingMonument =
         |. chompUntilEndOr "\n"
 
 
+parseBid : Parser GameCommand
+parseBid =
+    succeed Bid
+        |. spaces
+        |. keyword "bid"
+        |. spaces
+        |= Parser.int
+        |. chompUntilEndOr "\n"
+
+
+parsePass : Parser GameCommand
+parsePass =
+    succeed Pass
+        |. spaces
+        |. keyword "pass"
+        |. chompUntilEndOr "\n"
+
+
 
 -- * Auto-generated
 
@@ -103,5 +125,11 @@ encodeGameCommand val =
 
                 PlaceStartingMonument v1 ->
                     ( "PlaceStartingMonument", encodeValue (encodeLocation v1) )
+
+                Bid amount ->
+                    ( "Bid", encodeValue (Encode.int amount) )
+
+                Pass ->
+                    ( "Pass", encodeValue (Encode.list (\_ -> Encode.null) []) )
     in
     encodeSumObjectWithSingleField keyval val

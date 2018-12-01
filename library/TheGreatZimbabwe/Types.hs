@@ -334,14 +334,14 @@ instance Semigroup GenerosityOfKingsState where
   g1 <> g2 = GenerosityOfKingsState
     { generosityOfKingsStatePlaques = on (<>) generosityOfKingsStatePlaques g1 g2
     , generosityOfKingsStateCattlePool = on (+) generosityOfKingsStateCattlePool g1 g2
-    , generosityOfKingsStateLastBid = on plusMay generosityOfKingsStateLastBid g1 g2
+    , generosityOfKingsStateLastBid = on secondMay generosityOfKingsStateLastBid g1 g2
     , generosityOfKingsStatePlayersPassed = on (<>) generosityOfKingsStatePlayersPassed g1 g2
     }
    where
-    plusMay Nothing Nothing = Nothing
-    plusMay Nothing (Just n) = Just n
-    plusMay (Just n) Nothing = Just n
-    plusMay (Just n) (Just m) = Just $ m + n
+    secondMay Nothing Nothing = Nothing
+    secondMay Nothing (Just n) = Just n
+    secondMay (Just n) Nothing = Just n
+    secondMay (Just n) (Just m) = Just m
 
 instance Monoid GenerosityOfKingsState where
   mempty = GenerosityOfKingsState mempty 0 Nothing mempty

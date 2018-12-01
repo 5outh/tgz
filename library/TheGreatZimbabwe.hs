@@ -15,6 +15,7 @@ import           Control.Lens
 import           Data.List
 import qualified Data.Map.Strict                    as M
 import           Data.Maybe
+import           Debug.Trace
 import           Numeric.Natural
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Text
@@ -32,6 +33,8 @@ runGameCommand game playerId = \case
   ChooseEmpire e -> handleFinishPreSetup (chooseEmpire e playerId game)
   PlaceStartingMonument location ->
     handleFinishSetup (placeStartingMonument location playerId game)
+  Bid amount -> handleFinishGenerosityOfKings (bid amount playerId game)
+  Pass       -> handleFinishGenerosityOfKings (pass playerId game)
 
 runGameCommands :: Game -> [(PlayerId, GameCommand)] -> Either GameError Game
 runGameCommands game commands = foldl' go (Right game) commands
@@ -43,6 +46,34 @@ runGameCommands game commands = foldl' go (Right game) commands
     Right game' -> runGameCommand game' playerId command
 
 -- * Common
+
+cyclePlayersWithPasses :: Game -> Either GameError Game
+cyclePlayersWithPasses game = do
+  player <- nextPlayer (game ^. round . currentPlayer)
+  let setPlayer = mempty & round .~ mempty { roundCurrentPlayer = Just player }
+      stepRound = mempty { gameStep = 1 }
+
+  (length gokPlayersPassed == length players')
+    `impliesError` "All players have passed"
+
+  pure $ game <> setPlayer <> stepRound
+ where
+  players' :: [PlayerId]
+  players'         = game ^. round . players
+
+  gokPlayersPassed = game ^. round . generosityOfKingsState . playersPassed
+
+  nextPlayer player' = case player' of
+    Nothing       -> internalError "Could not find current player."
+    Just playerId -> case elemIndex playerId players' of
+      Nothing -> internalError "Current player was not found in game."
+      Just i  -> if i < length players' - 1
+        then
+          let nextPlayerId = players' !! succ i
+          in  if nextPlayerId `notElem` gokPlayersPassed
+                then Right nextPlayerId
+                else nextPlayer (Just nextPlayerId)
+        else Right (head players')
 
 cyclePlayers :: Game -> Either GameError Game
 cyclePlayers game = do
@@ -114,6 +145,7 @@ handleFinishSetup :: PlayerAction 'Setup -> Either GameError Game
 handleFinishSetup (PlayerAction act) = do
   game <- act
   let players' = M.elems (game ^. players)
+
   cyclePlayers $ if (all (not . M.null) $ map playerMonuments players')
     then setupGenerosityOfKings game
     else game
@@ -121,7 +153,7 @@ handleFinishSetup (PlayerAction act) = do
 
 setupGenerosityOfKings :: Game -> Game
 setupGenerosityOfKings game =
-  game <> setPhase <> setPlayerOrder <> resetGenerosityOfKings
+  withPlayerOrder <> setPhase <> resetGenerosityOfKings
  where
   setPhase = mempty & round . currentPhase .~ Just GenerosityOfKings
 
@@ -148,7 +180,22 @@ setupGenerosityOfKings game =
   resetGenerosityOfKings =
     mempty & round . generosityOfKingsState .~ generosityOfKingsState0
 
-  setPlayerOrder = mempty & round . players .~ map fst playersOrderedByVR
+  withPlayerOrder = game & round . players .~ map fst playersOrderedByVR
+
+-- TODO: Fill out
+handleFinishGenerosityOfKings
+  :: PlayerAction 'GenerosityOfKings -> Either GameError Game
+handleFinishGenerosityOfKings (PlayerAction act) = do
+  game <- act
+
+  let gokPlayersPassed = game ^. round . generosityOfKingsState . playersPassed
+      players'         = game ^. round . players
+
+  -- move to next phase if all players have passed
+  if length gokPlayersPassed == length players'
+    then
+      Right $ game <> mempty & round . currentPhase .~ Just ReligionAndCulture
+    else cyclePlayersWithPasses game -- TODO: setup main phase when all have passed
 
 placeStartingMonument :: Location -> PlayerId -> Game -> PlayerAction 'Setup
 placeStartingMonument location playerId game = PlayerAction $ do
@@ -181,8 +228,6 @@ placeStartingMonument location playerId game = PlayerAction $ do
   withStartingMonument = mempty { playerMonuments = M.singleton location 1 }
 
 -- * Generosity of Kings Phase
-
-data GenerosityOfKingsAction = Bid Natural | Pass
 
 getPlayer :: PlayerId -> Game -> Either GameError Player
 getPlayer playerId game = case M.lookup playerId (game ^. players) of
@@ -221,8 +266,10 @@ bid amount playerId game = PlayerAction $ do
   minimumBid = maybe 0 succ (game ^. round . generosityOfKingsState . lastBid)
 
   modifiedGenerosityOfKings :: GenerosityOfKingsState
-  modifiedGenerosityOfKings =
-    mempty { generosityOfKingsStateCattlePool = (-amount) }
+  modifiedGenerosityOfKings = mempty
+    { generosityOfKingsStateCattlePool = amount
+    , generosityOfKingsStateLastBid    = Just amount
+    }
 
   modifiedPlayer = mempty { playerCattle = (negate $ fromIntegral amount) }
 
@@ -230,6 +277,7 @@ pass :: PlayerId -> Game -> PlayerAction 'GenerosityOfKings
 pass playerId game = PlayerAction $ do
   (playerId `elem` game ^. playersPassedLens)
     `impliesInvalid` "You have already passed."
+
   pure $ game & playersPassedLens %~ (playerId :)
  where
   playersPassedLens :: Lens' Game [PlayerId]
