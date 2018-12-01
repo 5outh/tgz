@@ -4,6 +4,7 @@ var ctx;
 export function getGameCanvasContext() {
   canvas = document.getElementById('game-canvas');
   ctx = canvas.getContext('2d');
+  ctx.textAlign="center"
 
   return ctx;
 }
@@ -39,8 +40,8 @@ export function renderMapLayout(mapLayout) {
       const [x, y] = locationToCoordinates(size, location);
       const padding = (size - textSize) / 2
       const smallPadding = (size - smallTextSize) / 2
-      const [textX, textY] = [x + padding, y + 2*padding]
-      const [locTextX, locTextY] = [x + smallPadding, y + 2.5*smallPadding]
+      const [textX, textY] = [x + (2*padding), y + 2*padding]
+      const [locTextX, locTextY] = [x + (1.5*smallPadding), y + 2.5*smallPadding]
 
       if (square.Land) {
         ctx.fillStyle = 'Linen';
@@ -109,5 +110,76 @@ export function renderMapLayout(mapLayout) {
         ctx.strokeRect(x, y, size, size)
       }
     }
+  }
+
+  // Return an empty string for Elm runtime.
+  return "";
+}
+
+// overlay player monuments on the grid
+export function overlayPlayerMonuments(monumentsAndEmpire) {
+  const monuments = monumentsAndEmpire.monuments
+  const empire = monumentsAndEmpire.empire
+
+  var ctx = getGameCanvasContext()
+
+  // either 12 or 18 squares
+  let numSquares = 18
+  if (monuments.length == 144) {
+    numSquares = 12;
+  }
+
+  const size = 720 / numSquares
+  const textSize = size / 2.5
+  const smallTextSize = size / 3.5
+
+  if (ctx) {
+    for (let i = 0; i < monuments.length; i++) {
+      const smallPadding = (size - smallTextSize) / 2
+      const [locTextX, locTextY] = [x + smallPadding, y + 2.5*smallPadding]
+
+      const [location, monumentCount] = monuments[i];
+      const [x, y] = locationToCoordinates(size, location);
+      const centerX = x + size / 2
+      const centerY = y + size / 2
+      const radius = size / 2.25
+      const [background, textColor] = empireColors(empire);
+
+      // TODO: This is pretty silly, we should abstract it
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI, false);
+      ctx.fillStyle = background;
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#003300';
+      ctx.stroke();
+
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold ' + textSize + 'px monospace';
+      ctx.textAlign="center"
+      // todo not sure why we need y offset
+      ctx.fillText(String(monumentCount), centerX, centerY);
+
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold ' + (textSize/1.5) + 'px monospace';
+      ctx.textAlign="center"
+      ctx.fillText(locationText(location), centerX, centerY + size/4);
+    }
+  }
+}
+
+function empireColors(empire) {
+  // todo
+  switch(empire){
+    case 'Kilwa':
+      return ['red', 'white'];
+    case 'Mutapa':
+      return ['yellow', 'black'];
+    case 'Zulu':
+      return ['green', 'white'];
+    case 'Mapungubwe':
+      return ['white', 'black'];
+    case 'Lozi':
+      return ['black', 'white'];
   }
 }

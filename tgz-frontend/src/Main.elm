@@ -10,7 +10,19 @@ module Main exposing
     , view
     )
 
-import ApiTypes as ApiTypes exposing (Empire(..), GameView, MapLayout, Player, decodeGameView, encodeMapLayout, showEmpire)
+import ApiTypes as ApiTypes
+    exposing
+        ( Empire(..)
+        , GameView
+        , Location
+        , MapLayout
+        , Player
+        , decodeGameView
+        , encodeEmpire
+        , encodeMapLayout
+        , encodeMonuments
+        , showEmpire
+        )
 import Browser
 import Browser.Navigation as Nav
 import Canvas
@@ -18,12 +30,13 @@ import CanvasColor as Color exposing (Color)
 import Dict
 import GameCommand exposing (GameCommand(..), encodeGameCommand, parseGameCommand)
 import GameError exposing (GameError(..), decodeGameErrorFromBadStatusResponse)
-import Html exposing (Attribute, Html, button, canvas, div, h1, h3, img, input, li, p, span, text, ul)
+import Html exposing (Attribute, Html, button, canvas, div, h1, h2, h3, img, input, li, p, span, text, ul)
 import Html.Attributes exposing (height, id, placeholder, src, style, value, width)
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Html.Keyed exposing (node)
 import Http
 import Json.Decode as Json
+import Json.Encode as E
 import Parser
 import Ports
 import Task
@@ -35,6 +48,40 @@ import Url.Parser exposing ((</>), Parser, int, map, oneOf, parse, s, string)
 onKeyUp : (Int -> msg) -> Attribute msg
 onKeyUp tagger =
     on "keyup" (Json.map tagger keyCode)
+
+
+unsafeSend : msg -> Cmd msg
+unsafeSend msg =
+    Task.succeed msg
+        |> Task.perform identity
+
+
+
+-- Encode a player for use with map overlay
+
+
+encodePlayerMonuments : Player -> Maybe E.Value
+encodePlayerMonuments player =
+    case player.empire of
+        Just e ->
+            Just <|
+                E.object
+                    [ ( "empire", encodeEmpire e )
+                    , ( "monuments", encodeMonuments player.monuments )
+                    ]
+
+        Nothing ->
+            Nothing
+
+
+overlayPlayer : Player -> Cmd msg
+overlayPlayer player =
+    case encodePlayerMonuments player of
+        Nothing ->
+            Cmd.none
+
+        Just monuments ->
+            Ports.overlayPlayerMonuments monuments
 
 
 
@@ -130,6 +177,7 @@ type Msg
     | UrlChanged Url.Url
     | IssueGameCommand GameCommand
     | UpdateCommand String
+    | MapLayoutRendered
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -168,6 +216,27 @@ update msg model =
                       }
                     , Ports.renderMapLayout (encodeMapLayout gameView.state.mapLayout)
                     )
+
+        MapLayoutRendered ->
+            ( model
+            , case model.gameView of
+                Nothing ->
+                    Cmd.none
+
+                Just gameView ->
+                    Cmd.batch
+                        (List.map
+                            (\p ->
+                                case encodePlayerMonuments p of
+                                    Nothing ->
+                                        Cmd.none
+
+                                    Just monuments ->
+                                        Ports.overlayPlayerMonuments monuments
+                            )
+                            (Dict.values gameView.state.players)
+                        )
+            )
 
         IssueGameCommand command ->
             case model.route of
@@ -243,27 +312,53 @@ view model =
 -- TODO: refactor to place control panel within
 
 
+trace val =
+    Debug.log (Debug.toString val) val
+
+
+lookupCurrentPlayer : GameView -> Maybe Player
+lookupCurrentPlayer game =
+    case game.state.round.currentPlayer of
+        Nothing ->
+            Nothing
+
+        Just playerId ->
+            Dict.get playerId game.state.players
+
+
 renderGame : GameView -> Html Msg
 renderGame game =
+    let
+        currentPlayerUsername =
+            Maybe.map (.info >> .username) (lookupCurrentPlayer game)
+    in
     div []
         [ div []
             [ h1 [] [ text game.name ]
             ]
         , gameCanvas
-        , div [] [ listPlayers (Dict.values game.state.players) ]
+        , div [] [ listPlayers currentPlayerUsername (trace <| Dict.values game.state.players) ]
 
         -- TODO: Only if Pre-Setup phase, and add choices
         , renderPreSetupActionBoard game
         ]
 
 
-listPlayers : List Player -> Html Msg
-listPlayers players =
-    ul [] (List.map renderPlayer players)
+listPlayers : Maybe String -> List Player -> Html Msg
+listPlayers mCurrentPlayerUsername players =
+    ul []
+        (List.map
+            (\player ->
+                renderPlayer
+                    (Just player.info.username == mCurrentPlayerUsername)
+                    player
+            )
+            players
+        )
 
 
-renderPlayer : Player -> Html Msg
-renderPlayer player =
+renderPlayer : Bool -> Player -> Html Msg
+renderPlayer isCurrentPlayer player =
     let
         playerEmpire =
             case player.empire of
@@ -280,10 +375,17 @@ renderPlayer player =
 
                 Just god ->
                     ApiTypes.showGod god
+
+        renderUsername =
+            if isCurrentPlayer then
+                h2 [] [ text (player.info.username ++ " (current player)") ]
+
+            else
+                h3 [] [ text player.info.username ]
     in
     li []
         [ div []
-            [ h3 [] [ text player.info.username ]
+            [ renderUsername
             , p [] [ text ("Empire: " ++ playerEmpire) ]
             , p [] [ text ("God: " ++ playerGod) ]
             , p [] [ text ("VR: " ++ String.fromInt player.victoryRequirement) ]
@@ -374,7 +476,7 @@ main =
         { view = view
         , init = init
         , update = update
-        , subscriptions = always Sub.none
+        , subscriptions = \_ -> Ports.mapLayoutRendered (\_ -> MapLayoutRendered)
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         }

@@ -24,6 +24,7 @@ module ApiTypes exposing
     , encodeEmpire
     , encodeLocation
     , encodeMapLayout
+    , encodeMonuments
     , encodeUserView
     , intDict
     , showEmpire
@@ -55,14 +56,16 @@ decodeGameView =
 type alias Game =
     { players : Dict Int Player
     , mapLayout : Dict Location Square
+    , round : Round
     }
 
 
 decodeGame : Decoder Game
 decodeGame =
-    Decode.succeed (\a b -> { players = a, mapLayout = b })
+    Decode.succeed (\a b c -> { players = a, mapLayout = b, round = c })
         |> required "players" (intDict decodePlayer)
         |> required "map_layout" decodeMapLayout
+        |> required "round" jsonDecRound
 
 
 type alias Player =
@@ -394,6 +397,13 @@ decodeMonuments =
         )
 
 
+encodeMonuments : Dict Location Int -> Value
+encodeMonuments monuments =
+    Encode.list
+        (\( v1, v2 ) -> Encode.list identity [ encodeLocation v1, Encode.int v2 ])
+        (Dict.toList monuments)
+
+
 encodeMapLayout : MapLayout -> Value
 encodeMapLayout val =
     Encode.list
@@ -461,3 +471,80 @@ encodeUserView val =
         , ( "username", Encode.string val.username )
         , ( "email", Encode.string val.email )
         ]
+
+
+type alias Round =
+    { players : List Int
+    , currentPlayer : Maybe Int
+    , usedMarkers : List ( Location, UsedMarker )
+    , generosityOfKingsState : GenerosityOfKingsState
+    , currentPhase : Maybe Phase
+    }
+
+
+jsonDecRound : Decode.Decoder Round
+jsonDecRound =
+    Decode.succeed
+        (\pplayers pcurrent_player pused_markers pgenerosity_of_kings_state pcurrent_phase ->
+            { players = pplayers
+            , currentPlayer = pcurrent_player
+            , usedMarkers = pused_markers
+            , generosityOfKingsState = pgenerosity_of_kings_state
+            , currentPhase = pcurrent_phase
+            }
+        )
+        |> required "players" (Decode.list Decode.int)
+        |> fnullable "current_player" Decode.int
+        |> required "used_markers" (Decode.list (Decode.map2 tuple2 (Decode.index 0 decodeLocation) (Decode.index 1 jsonDecUsedMarker)))
+        |> required "generosity_of_kings_state" jsonDecGenerosityOfKingsState
+        |> fnullable "current_phase" jsonDecPhase
+
+
+type Phase
+    = PreSetup
+    | Setup
+    | GenerosityOfKings
+    | ReligionAndCulture
+    | Revenues
+    | LetUsCompareMythologies
+
+
+jsonDecPhase : Decode.Decoder Phase
+jsonDecPhase =
+    let
+        jsonDecDictPhase =
+            Dict.fromList [ ( "PreSetup", PreSetup ), ( "Setup", Setup ), ( "GenerosityOfKings", GenerosityOfKings ), ( "ReligionAndCulture", ReligionAndCulture ), ( "Revenues", Revenues ), ( "LetUsCompareMythologies", LetUsCompareMythologies ) ]
+    in
+    decodeSumUnaries "Phase" jsonDecDictPhase
+
+
+type UsedMarker
+    = NotUsed
+    | Used
+    | UsedTwice
+
+
+jsonDecUsedMarker : Decode.Decoder UsedMarker
+jsonDecUsedMarker =
+    let
+        jsonDecDictUsedMarker =
+            Dict.fromList [ ( "NotUsed", NotUsed ), ( "Used", Used ), ( "UsedTwice", UsedTwice ) ]
+    in
+    decodeSumUnaries "UsedMarker" jsonDecDictUsedMarker
+
+
+type alias GenerosityOfKingsState =
+    { plaques : List Empire
+    , cattle_pool : Int
+    , last_bid : Maybe Int
+    , players_passed : List Int
+    }
+
+
+jsonDecGenerosityOfKingsState : Decode.Decoder GenerosityOfKingsState
+jsonDecGenerosityOfKingsState =
+    Decode.succeed (\pplaques pcattle_pool plast_bid pplayers_passed -> { plaques = pplaques, cattle_pool = pcattle_pool, last_bid = plast_bid, players_passed = pplayers_passed })
+        |> required "plaques" (Decode.list decodeEmpire)
+        |> required "cattle_pool" Decode.int
+        |> fnullable "last_bid" Decode.int
+        |> required "players_passed" (Decode.list Decode.int)
