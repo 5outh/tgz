@@ -13,7 +13,9 @@ module Main exposing
 import ApiTypes as ApiTypes
     exposing
         ( Empire(..)
+        , EmpirePlaque(..)
         , GameView
+        , GenerosityOfKingsState
         , Location
         , MapLayout
         , Player
@@ -337,6 +339,7 @@ renderGame game =
             [ h1 [] [ text game.name ]
             ]
         , gameCanvas
+        , renderGenerosityOfKingsState game.state.round.generosityOfKingsState
         , div [] [ listPlayers currentPlayerUsername (trace <| Dict.values game.state.players) ]
 
         -- TODO: Only if Pre-Setup phase, and add choices
@@ -472,7 +475,58 @@ renderPreSetupActionBoard game =
     span [] (List.map empireElement availableEmpires)
 
 
-empireColors : Maybe Empire -> ( String, String )
+renderGenerosityOfKingsState : GenerosityOfKingsState -> Html Msg
+renderGenerosityOfKingsState state =
+    let
+        plaquesWithCattle totalCattle plaques =
+            let
+                len =
+                    List.length plaques
+
+                allGet =
+                    totalCattle // len
+
+                remaining =
+                    modBy len totalCattle
+
+                zip xs ys =
+                    case ( xs, ys ) of
+                        ( x :: xrest, y :: yrest ) ->
+                            ( x, y ) :: zip xrest yrest
+
+                        ( [], _ ) ->
+                            []
+
+                        ( _, [] ) ->
+                            []
+
+                addOneTo n xs =
+                    case ( n, xs ) of
+                        ( 0, _ ) ->
+                            xs
+
+                        ( _, [] ) ->
+                            []
+
+                        ( n0, ( x, m ) :: rest ) ->
+                            ( x, m + 1 ) :: addOneTo (n0 - 1) rest
+            in
+            addOneTo remaining (zip plaques (List.repeat (List.length plaques) allGet))
+
+        renderPlaque plaque =
+            case plaque of
+                ( PlayerPlaque empire, amount ) ->
+                    div [] [ text (showEmpire empire ++ " (" ++ String.fromInt amount ++ ")") ]
+
+                ( ShadipinyiPlaque, amount ) ->
+                    div [] [ text ("Shadipinyi (God of Drunks) (" ++ String.fromInt amount ++ ")") ]
+    in
+    div []
+        [ h3 [] [ text "Generosity of Kings" ]
+        , div [] (List.map renderPlaque (plaquesWithCattle state.cattlePool state.plaques))
+        ]
+
+
 empireColors mEmpire =
     case mEmpire of
         Nothing ->

@@ -115,9 +115,7 @@ handleFinishSetup (PlayerAction act) = do
   game <- act
   let players' = M.elems (game ^. players)
   cyclePlayers $ if (all (not . M.null) $ map playerMonuments players')
-    then
-      setupGenerosityOfKings game
-        & (round . currentPhase .~ Just GenerosityOfKings)
+    then setupGenerosityOfKings game
     else game
 
 
@@ -126,6 +124,7 @@ setupGenerosityOfKings game =
   game <> setPhase <> setPlayerOrder <> resetGenerosityOfKings
  where
   setPhase = mempty & round . currentPhase .~ Just GenerosityOfKings
+
   -- if anyone has Shadipinyi, he goes first.
   playerHasShadipinyi =
     any ((== Just Shadipinyi) . playerGod) $ M.elems (game ^. players)
@@ -180,8 +179,6 @@ placeStartingMonument location playerId game = PlayerAction $ do
   isTaken              = location `elem` otherPlayerMonumentLocations
 
   withStartingMonument = mempty { playerMonuments = M.singleton location 1 }
-  changeSet            = mconcat
-    [setPlayer playerId withStartingMonument, addVictoryPoints 1 playerId game]
 
 -- * Generosity of Kings Phase
 
@@ -240,9 +237,6 @@ pass playerId game = PlayerAction $ do
 
 clearSlate :: Game -> GameEvent 'GenerosityOfKings
 clearSlate = undefined
-
-orderPlaques :: Game -> GameEvent 'GenerosityOfKings
-orderPlaques = undefined
 
 endGenerosityOfKings :: Game -> GameEvent 'GenerosityOfKings
 endGenerosityOfKings = undefined

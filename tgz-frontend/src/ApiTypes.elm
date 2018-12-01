@@ -1,7 +1,9 @@
 module ApiTypes exposing
     ( Empire(..)
+    , EmpirePlaque(..)
     , Game
     , GameView
+    , GenerosityOfKingsState
     , God(..)
     , Land(..)
     , Location
@@ -548,18 +550,35 @@ jsonDecUsedMarker =
     decodeSumUnaries "UsedMarker" jsonDecDictUsedMarker
 
 
+type EmpirePlaque
+    = PlayerPlaque Empire
+    | ShadipinyiPlaque
+
+
+decodeEmpirePlaque : Decoder EmpirePlaque
+decodeEmpirePlaque =
+    let
+        empirePlaqueDict =
+            Dict.fromList
+                [ ( "ShadipinyiPlaque", Decode.lazy (\_ -> Decode.succeed ShadipinyiPlaque) )
+                , ( "PlayerPlaque", Decode.lazy (\_ -> Decode.map PlayerPlaque decodeEmpire) )
+                ]
+    in
+    decodeSumObjectWithSingleField "Square" empirePlaqueDict
+
+
 type alias GenerosityOfKingsState =
-    { plaques : List Empire
-    , cattle_pool : Int
-    , last_bid : Maybe Int
-    , players_passed : List Int
+    { plaques : List EmpirePlaque
+    , cattlePool : Int
+    , lastBid : Maybe Int
+    , playersPassed : List Int
     }
 
 
 jsonDecGenerosityOfKingsState : Decode.Decoder GenerosityOfKingsState
 jsonDecGenerosityOfKingsState =
-    Decode.succeed (\pplaques pcattle_pool plast_bid pplayers_passed -> { plaques = pplaques, cattle_pool = pcattle_pool, last_bid = plast_bid, players_passed = pplayers_passed })
-        |> required "plaques" (Decode.list decodeEmpire)
+    Decode.succeed (\pplaques pcattlePool plastBid pplayersPassed -> { plaques = pplaques, cattlePool = pcattlePool, lastBid = plastBid, playersPassed = pplayersPassed })
+        |> required "plaques" (Decode.list decodeEmpirePlaque)
         |> required "cattle_pool" Decode.int
         |> fnullable "last_bid" Decode.int
         |> required "players_passed" (Decode.list Decode.int)
