@@ -79,10 +79,15 @@ data Empire
 
 deriveBoth (unPrefix "empire") ''Empire
 
+data EmpirePlaque = PlayerPlaque Empire | ShadipinyiPlaque
+  deriving (Show, Eq)
+
+deriveBoth defaultOptions ''EmpirePlaque
+
 data Resource = Clay | Wood | Ivory | Diamonds
   deriving (Show, Eq, Generic)
 
-deriveBoth (unPrefix "resource") ''Resource
+deriveBoth defaultOptions ''Resource
 
 data Land
   = StartingArea
@@ -197,7 +202,7 @@ data God
   -- ^ Receives 2 additional cattle in each revenue phase
   | Xango
   -- ^ Victory Requirement - 2
-    deriving (Generic, Show)
+    deriving (Generic, Show, Eq, Ord)
 
 deriveBoth defaultOptions ''God
 
@@ -217,14 +222,27 @@ godVR = \case
   TsuiGoab   -> 3
   Xango      -> (-2)
 
+data Points = Points
+  { pointsPoints :: Natural
+  , pointsStep :: Natural
+  } deriving (Show, Eq, Ord)
+
+deriveBoth (unPrefix "points") ''Points
+
+instance Semigroup Points where
+  p1 <> p2 = Points (pointsPoints p1 + pointsPoints p2) (pointsStep p2)
+
+instance Monoid Points where
+  mempty = Points 0 0
+
 -- Little idea: this could be encoded as a Monoid and state changes could be
 -- encoded as mempty{ change }. could the whole game be done that way?
 data Player = Player
   { playerInfo               :: Maybe PlayerInfo
   -- ^ Info about the human player
-  , playerVictoryRequirement :: Int
+  , playerVictoryRequirement :: Points
   -- ^ Player's current victory requirement
-  , playerVictoryPoints      :: Int
+  , playerVictoryPoints      :: Points
   -- ^ Player's current victory points
   , playerEmpire             :: Maybe Empire
   -- ^ The Empire the Player belongs to. Players have to choose this at the
@@ -244,28 +262,30 @@ data Player = Player
   -- ^ God a player adores
   } deriving (Generic, Show)
 
-enrichPlayerVP :: Player -> Player
-enrichPlayerVP player@(Player {..}) =
-  player & victoryPoints +~ fromIntegral extraVictoryPoints
- where
-  extraVictoryPoints = sum [monumentVP, technologyCardVP]
-  monumentVP         = sum $ map getHeightVP (M.elems playerMonuments)
-  technologyCardVP =
-    sum $ map technologyCardVictoryPoints (M.keys playerTechnologyCards)
-  getHeightVP = \case
-    1 -> 1
-    2 -> 3
-    3 -> 7
-    4 -> 13
-    5 -> 21
-    _ -> error "Height invalid!"
+-- TODO: This is NOT what I want. We need to track *when* players got their VP.
+
+--enrichPlayerVP :: Player -> Player
+--enrichPlayerVP player@(Player {..}) =
+  --player & victoryPoints +~ fromIntegral extraVictoryPoints
+ --where
+  --extraVictoryPoints = sum [monumentVP, technologyCardVP]
+  --monumentVP         = sum $ map getHeightVP (M.elems playerMonuments)
+  --technologyCardVP =
+    --sum $ map technologyCardVictoryPoints (M.keys playerTechnologyCards)
+  --getHeightVP = \case
+    --1 -> 1
+    --2 -> 3
+    --3 -> 7
+    --4 -> 13
+    --5 -> 21
+    --_ -> error "Height invalid!"
 
 instance Semigroup Player where
   p1 <> p2 = Player
     { playerInfo = on (<|>) playerInfo p1 p2
     --- ^ TODO: This may not be needed
-    , playerVictoryRequirement = on (+) playerVictoryRequirement p1 p2
-    , playerVictoryPoints = on (+) playerVictoryPoints p1 p2
+    , playerVictoryRequirement = on (<>) playerVictoryRequirement p1 p2
+    , playerVictoryPoints = on (<>) playerVictoryPoints p1 p2
     , playerEmpire = on (<|>) playerEmpire p1 p2
     , playerCattle = on (+) playerCattle p1 p2
     , playerMonuments = on (M.unionWith (+)) playerMonuments p1 p2
@@ -278,8 +298,8 @@ instance Semigroup Player where
 instance Monoid Player where
   mempty = Player
     { playerInfo = Nothing
-    , playerVictoryRequirement = 0
-    , playerVictoryPoints = 0
+    , playerVictoryRequirement = mempty
+    , playerVictoryPoints = mempty
     , playerEmpire = Nothing
     , playerCattle = 0
     , playerMonuments = mempty
@@ -299,7 +319,7 @@ data UsedMarker = NotUsed | Used | UsedTwice
 deriveBoth defaultOptions ''UsedMarker
 
 data GenerosityOfKingsState = GenerosityOfKingsState
-  { generosityOfKingsStatePlaques       :: [Empire]
+  { generosityOfKingsStatePlaques       :: [EmpirePlaque]
   -- ^ Ordered plaques (static)
   , generosityOfKingsStateCattlePool    :: Natural
   -- ^ Total number of cattle that have been bid (this along with plaques
@@ -385,6 +405,8 @@ data Game = Game
   , gameCraftsmen :: M.Map Craftsman (S.Set TechnologyCard)
   -- ^ Remaining Craftsmen of each type
   , gameWinner    :: Maybe PlayerId
+  -- ^ Current step of the game (cycles whenever current player cycles)
+  , gameStep :: Natural
   } deriving (Generic, Show)
 
 instance Semigroup Game where
@@ -394,17 +416,20 @@ instance Semigroup Game where
     , gameMapLayout = on appendLast gameMapLayout g1 g2
     , gameCraftsmen = on (M.unionWith (<>)) gameCraftsmen g1 g2
     , gameWinner = on (<|>) gameWinner g1 g2
+    , gameStep = on (+) gameStep g1 g2
     }
 
 instance Monoid Game where
-  mempty = Game mempty mempty Nothing mempty Nothing
+  mempty = Game mempty mempty Nothing mempty Nothing 0
 
 deriveBoth (unPrefix "game") ''Game
 makeLensesWith camelCaseFields ''Game
 
 -- TODO: I don't love this function, but it does the job for now.
-enrichPlayersVP :: Game -> Game
-enrichPlayersVP game = game & players %~ fmap enrichPlayerVP
+-- enrichPlayersVP :: Game -> Game
+--enrichPlayersVP game = game & players %~ fmap enrichPlayerVP
+
+-- TODO: enrichPlayersVR
 
 -- | Resource a craftsman requires
 craftsmanResource :: Craftsman -> Resource

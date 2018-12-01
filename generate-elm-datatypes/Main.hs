@@ -38,6 +38,8 @@ main = do
     , DefineElm (Proxy :: Proxy Game)
     , DefineElm (Proxy :: Proxy GameCommand)
     , DefineElm (Proxy :: Proxy GameError)
+    , DefineElm (Proxy :: Proxy Points)
+    , DefineElm (Proxy :: Proxy EmpirePlaque)
     -- Database reps
     , DefineElm (Proxy :: Proxy DB.GameView)
     , DefineElm (Proxy :: Proxy DB.UserView)

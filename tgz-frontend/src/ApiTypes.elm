@@ -57,21 +57,36 @@ type alias Game =
     { players : Dict Int Player
     , mapLayout : Dict Location Square
     , round : Round
+    , step : Int
     }
 
 
 decodeGame : Decoder Game
 decodeGame =
-    Decode.succeed (\a b c -> { players = a, mapLayout = b, round = c })
+    Decode.succeed (\a b c d -> { players = a, mapLayout = b, round = c, step = d })
         |> required "players" (intDict decodePlayer)
         |> required "map_layout" decodeMapLayout
         |> required "round" jsonDecRound
+        |> required "step" Decode.int
+
+
+type alias Points =
+    { points : Int
+    , step : Int
+    }
+
+
+decodePoints : Decoder Points
+decodePoints =
+    Decode.succeed (\a b -> { points = a, step = b })
+        |> required "points" Decode.int
+        |> required "step" Decode.int
 
 
 type alias Player =
     { info : PlayerInfo
-    , victoryRequirement : Int
-    , victoryPoints : Int
+    , victoryRequirement : Points
+    , victoryPoints : Points
     , empire : Maybe Empire
     , cattle : Int
     , monuments : Dict Location Int
@@ -98,8 +113,8 @@ decodePlayer =
             }
         )
         |> required "info" decodePlayerInfo
-        |> required "victory_requirement" Decode.int
-        |> required "victory_points" Decode.int
+        |> required "victory_requirement" decodePoints
+        |> required "victory_points" decodePoints
         |> required "empire" (Decode.maybe decodeEmpire)
         |> required "cattle" Decode.int
         |> required "monuments" decodeMonuments

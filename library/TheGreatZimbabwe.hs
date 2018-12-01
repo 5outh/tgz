@@ -29,14 +29,12 @@ import           TheGreatZimbabwe.Validation
 
 runGameCommand :: Game -> PlayerId -> GameCommand -> Either GameError Game
 runGameCommand game playerId = \case
-  -- TODO: When to break out of presetup?
   ChooseEmpire e -> handleFinishPreSetup (chooseEmpire e playerId game)
   PlaceStartingMonument location ->
     handleFinishSetup (placeStartingMonument location playerId game)
 
 runGameCommands :: Game -> [(PlayerId, GameCommand)] -> Either GameError Game
-runGameCommands game commands =
-  enrichPlayersVP <$> foldl' go (Right game) commands
+runGameCommands game commands = foldl' go (Right game) commands
  where
   go
     :: Either GameError Game -> (PlayerId, GameCommand) -> Either GameError Game
@@ -49,7 +47,9 @@ runGameCommands game commands =
 cyclePlayers :: Game -> Either GameError Game
 cyclePlayers game = do
   player <- nextPlayer
-  pure $ game <> (mempty & round .~ mempty { roundCurrentPlayer = Just player })
+  let setPlayer = mempty & round .~ mempty { roundCurrentPlayer = Just player }
+      stepRound = mempty { gameStep = 1 }
+  pure $ game <> setPlayer <> stepRound
  where
   players' :: [PlayerId]
   players'   = game ^. round . players
@@ -67,9 +67,25 @@ newRound _ = internalError "cannot start a new round yet"
 
 -- * Pre-Setup
 
-withPlayer :: PlayerId -> Player -> Game
-withPlayer playerId player =
+setPlayer :: PlayerId -> Player -> Game
+setPlayer playerId player =
   mempty { gamePlayers = M.singleton playerId player }
+
+addVictoryRequirement :: Natural -> PlayerId -> Game -> Game
+addVictoryRequirement pointsToAdd playerId game = setPlayer playerId stepPlayer
+ where
+  stepPlayer = mempty & victoryRequirement .~ Points
+    { pointsStep   = game ^. step
+    , pointsPoints = pointsToAdd
+    }
+
+addVictoryPoints :: Natural -> PlayerId -> Game -> Game
+addVictoryPoints pointsToAdd playerId game = setPlayer playerId stepPlayer
+ where
+  stepPlayer = mempty & victoryRequirement .~ Points
+    { pointsStep   = game ^. step
+    , pointsPoints = pointsToAdd
+    }
 
 chooseEmpire :: Empire -> PlayerId -> Game -> PlayerAction 'PreSetup
 chooseEmpire empire' playerId game = PlayerAction $ do
@@ -82,7 +98,7 @@ chooseEmpire empire' playerId game = PlayerAction $ do
   (empire' `elem` chosenEmpires)
     `impliesInvalid` "Empire has already been chosen."
 
-  pure $ game <> withPlayer playerId withEmpire
+  pure $ game <> setPlayer playerId withEmpire
 
 handleFinishPreSetup :: PlayerAction 'PreSetup -> Either GameError Game
 handleFinishPreSetup (PlayerAction act) = do
@@ -99,8 +115,41 @@ handleFinishSetup (PlayerAction act) = do
   game <- act
   let players' = M.elems (game ^. players)
   cyclePlayers $ if (all (not . M.null) $ map playerMonuments players')
-    then game & (round . currentPhase .~ Just GenerosityOfKings)
+    then
+      setupGenerosityOfKings game
+        & (round . currentPhase .~ Just GenerosityOfKings)
     else game
+
+
+setupGenerosityOfKings :: Game -> Game
+setupGenerosityOfKings game =
+  game <> setPhase <> setPlayerOrder <> resetGenerosityOfKings
+ where
+  setPhase = mempty & round . currentPhase .~ Just GenerosityOfKings
+  -- if anyone has Shadipinyi, he goes first.
+  playerHasShadipinyi =
+    any ((== Just Shadipinyi) . playerGod) $ M.elems (game ^. players)
+
+  -- current order of players
+  currentPlayerOrder = game ^. round . players
+
+  -- players ordered by VR
+  playersOrderedByVR =
+    sortOn (playerVictoryRequirement . snd) (game ^. players . to M.toList)
+
+  playerPlaques =
+    mapMaybe (fmap PlayerPlaque . playerEmpire . snd) playersOrderedByVR
+
+  empirePlaques = if playerHasShadipinyi
+    then ShadipinyiPlaque : playerPlaques
+    else playerPlaques
+
+  generosityOfKingsState0 = mempty & plaques .~ empirePlaques
+
+  resetGenerosityOfKings =
+    mempty & round . generosityOfKingsState .~ generosityOfKingsState0
+
+  setPlayerOrder = mempty & round . players .~ map fst playersOrderedByVR
 
 placeStartingMonument :: Location -> PlayerId -> Game -> PlayerAction 'Setup
 placeStartingMonument location playerId game = PlayerAction $ do
@@ -116,7 +165,10 @@ placeStartingMonument location playerId game = PlayerAction $ do
                      <> " because it has already been taken."
                      )
 
-  pure $ game <> changeSet
+  pure
+    $  game
+    <> setPlayer playerId withStartingMonument
+    <> addVictoryPoints 1 playerId game
  where
   isStartingMonument = case (game ^. mapLayout) of
     Nothing -> False
@@ -128,7 +180,8 @@ placeStartingMonument location playerId game = PlayerAction $ do
   isTaken              = location `elem` otherPlayerMonumentLocations
 
   withStartingMonument = mempty { playerMonuments = M.singleton location 1 }
-  changeSet            = withPlayer playerId withStartingMonument
+  changeSet            = mconcat
+    [setPlayer playerId withStartingMonument, addVictoryPoints 1 playerId game]
 
 -- * Generosity of Kings Phase
 
@@ -161,7 +214,7 @@ bid amount playerId game = PlayerAction $ do
 
   pure
     $  game
-    <> withPlayer playerId modifiedPlayer
+    <> setPlayer playerId modifiedPlayer
     <> (mempty & round . generosityOfKingsState .~ modifiedGenerosityOfKings)
  where
   playersPassedLens :: Lens' Game [PlayerId]

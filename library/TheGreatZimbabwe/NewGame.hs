@@ -28,13 +28,14 @@ newGame playerList = GameEvent <$> do
     Left  err    -> pure (Left err)
     Right layout -> do
       playerOrder <- shuffleM $ map fst playerList
-      let newPlayer playerInfo' = mempty { playerInfo = Just playerInfo'
-                                         , playerVictoryRequirement = 20
-                                         , playerVictoryPoints      = 0
-                                         , playerEmpire             = Nothing
-                                         , playerCattle             = 3
-                                         , playerGod                = Nothing
-                                         }
+      let newPlayer playerInfo' = mempty
+            { playerInfo               = Just playerInfo'
+            , playerVictoryRequirement = mempty { pointsPoints = 20 }
+            , playerVictoryPoints      = mempty { pointsPoints = 0 }
+            , playerEmpire             = Nothing
+            , playerCattle             = 3
+            , playerGod                = Nothing
+            }
           gamePlayers = M.fromList $ map (second newPlayer) playerList
           gameRound   = Round
             { roundPlayers                = playerOrder
@@ -51,6 +52,7 @@ newGame playerList = GameEvent <$> do
           gameCraftsmen = newGameCraftsmen
           gameWinner    = Nothing
           gameMapLayout = Just layout
+          gameStep      = 0
       pure $ Right Game {..}
 
 newGameCraftsmen :: M.Map Craftsman (S.Set TechnologyCard)
