@@ -58,18 +58,25 @@ decodeGameView =
 
 type alias Game =
     { players : Dict Int Player
-    , mapLayout : Dict Location Square
     , round : Round
+    , mapLayout : Dict Location Square
+    , gods : List God
+    , specialists : List Specialist
+    , winner : Maybe Int
     , step : Int
     }
 
 
 decodeGame : Decoder Game
 decodeGame =
-    Decode.succeed (\a b c d -> { players = a, mapLayout = b, round = c, step = d })
+    Decode.succeed
+        (\a b c d e f g -> { players = a, round = b, mapLayout = c, gods = d, specialists = e, winner = f, step = g })
         |> required "players" (intDict decodePlayer)
-        |> required "map_layout" decodeMapLayout
         |> required "round" decodeRound
+        |> required "map_layout" decodeMapLayout
+        |> required "gods" (Decode.list decodeGod)
+        |> required "specialists" (Decode.list decodeSpecialist)
+        |> required "winner" (Decode.nullable Decode.int)
         |> required "step" Decode.int
 
 
@@ -93,11 +100,11 @@ type alias Player =
     , empire : Maybe Empire
     , cattle : Int
     , monuments : Dict Location Int
+    , craftsmen : Dict Location (Rotated Craftsman)
 
-    --, craftsmen: Dict Location Craftsman TODO
     --, technologyCards: List (TechnologyCard, Int) TODO
     -- ^ note: TechnologyCard isn't comparable, so we have to decode to a list
-    --, specialists: List Specialist TODO
+    , specialists : List Specialist
     , god : Maybe God
     }
 
@@ -105,14 +112,16 @@ type alias Player =
 decodePlayer : Decoder Player
 decodePlayer =
     Decode.succeed
-        (\a b c d e f g ->
+        (\a b c d e f g h i ->
             { info = a
             , victoryRequirement = b
             , victoryPoints = c
             , empire = d
             , cattle = e
             , monuments = f
-            , god = g
+            , craftsmen = g
+            , specialists = h
+            , god = i
             }
         )
         |> required "info" decodePlayerInfo
@@ -121,6 +130,8 @@ decodePlayer =
         |> required "empire" (Decode.maybe decodeEmpire)
         |> required "cattle" Decode.int
         |> required "monuments" decodeMonuments
+        |> required "craftsmen" (decodeLocationDict (decodeRotated decodeCraftsman))
+        |> required "specialists" (Decode.list decodeSpecialist)
         |> required "god" (Decode.maybe decodeGod)
 
 
@@ -449,12 +460,17 @@ decodeMapLayout =
 
 decodeMonuments : Decoder (Dict Location Int)
 decodeMonuments =
+    decodeLocationDict Decode.int
+
+
+decodeLocationDict : Decoder a -> Decoder (Dict Location a)
+decodeLocationDict decodeA =
     Decode.map
         Dict.fromList
         (Decode.list
             (Decode.map2 tuple2
                 (Decode.index 0 decodeLocation)
-                (Decode.index 1 Decode.int)
+                (Decode.index 1 decodeA)
             )
         )
 
