@@ -583,3 +583,55 @@ jsonDecGenerosityOfKingsState =
         |> required "cattle_pool" Decode.int
         |> fnullable "last_bid" Decode.int
         |> required "players_passed" (Decode.list Decode.int)
+
+-- Religion and Culture types
+
+type Craftsman
+  -- * Primary
+  = Potter
+  | IvoryCarver
+  | WoodCarver
+  | DiamondCutter
+  -- * Secondary
+  | VesselMaker
+  | ThroneMaker
+  | Sculptor
+
+type Specialist
+  = Shaman
+  -- ^ May place one resource for 2 cattle (additional action type)
+  | RainCeremony
+  -- ^ May place one water tile for 3 cattle
+  | Herd Int
+  -- ^ May pay 2 cattle to this card to gain 1 cattle from the common stock.
+  -- Use at most 3 times per turn.
+  | Builder Int
+  -- ^ Pay 2 cattle to activate this turn.
+  -- If active, you pay the first two cattle of each newly placed craftsman to
+  -- this card.
+  | Nomads
+  -- ^ Pay 2 cattle to ignore zoning restrictions when building a new monument
+
+type Rotated a = Rotated | Unmoved a
+
+type RaiseMonumentCommand
+  = UseHub Location
+  -- ^ Use a hub at some location, utilizing the resource at another location
+  | UseCraftsman Location Location
+  -- ^ Use a craftsman at some location, utilizing the resource at another location
+
+type ReligionAndCultureCommand1 = ChooseGod God | ChooseSpecialist Specialist
+
+type UseSpecialist = UseSpecialist Specialist
+
+type ReligionAndCultureCommand3
+  = BuildMonuments (List Location)
+  | PlaceCraftsmen (List (Location, Rotated Craftsman))
+  | RaiseMonuments (List (Location, List RaiseMonumentCommand))
+
+type alias ReligionAndCultureMultiCommand =
+  { religionAndCultureMultiCommandAction1 : Maybe ReligionAndCultureCommand1
+  , religionAndCultureMultiCommandAction2 : Maybe UseSpecialist
+  , religionAndCultureMultiCommandAction3 : Maybe ReligionAndCultureCommand3
+  , religionAndCultureMultiCommandEnd     : Bool
+  }

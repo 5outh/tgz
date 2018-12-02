@@ -16,6 +16,7 @@
 
 module TheGreatZimbabwe.Types where
 
+import           Data.Tuple                               ( swap )
 import           Control.Applicative
 import           Control.Lens
 import           Data.Aeson                        hiding ( defaultOptions )
@@ -30,6 +31,7 @@ import           Numeric.Natural
 import           Prelude                           hiding ( round )
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Aeson
+import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Orphans                 ( )
 import           Elm.Derive
 
@@ -41,8 +43,14 @@ deriveBoth (unPrefix "get") ''PlayerId
 
 data Location = Location
   { locationX :: !Natural
-  , locationY :: !String
+  , locationY :: !Char
   } deriving (Show, Eq, Ord, Generic)
+
+locationAbove :: Location -> Location
+locationAbove loc = loc { locationY = pred (locationY loc) }
+
+locationLeft :: Location -> Location
+locationLeft loc = loc { locationX = pred (locationX loc) }
 
 instance ToJSONKey Location where
   toJSONKey = ToJSONKeyValue toJSON toEncoding
@@ -52,6 +60,9 @@ instance FromJSONKey Location where
 
 deriveBoth (unPrefix "location") ''Location
 makeLensesWith camelCaseFields ''Location
+
+pprintLocation :: Location -> T.Text
+pprintLocation (Location x y) = T.pack [y] <> tshow x
 
 newtype Username = Username { usernameUsername :: T.Text }
   deriving (Generic, Show)
@@ -120,7 +131,7 @@ data Craftsman
   | VesselMaker
   | ThroneMaker
   | Sculptor
-    deriving (Eq, Ord, Generic, Show)
+    deriving (Eq, Ord, Show)
 
 instance FromJSONKey Craftsman where
   fromJSONKey = FromJSONKeyValue parseJSON
@@ -129,6 +140,53 @@ instance ToJSONKey Craftsman where
   toJSONKey = ToJSONKeyValue toJSON toEncoding
 
 deriveBoth defaultOptions ''Craftsman
+
+-- | Rotated 90 degrees (or not)
+data Rotated a = Rotated a | UnRotated a
+  deriving (Show, Eq, Ord, Generic)
+
+instance ToJSON a => ToJSON (Rotated a) where
+  toJSON = genericToJSON defaultOptions
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON a => FromJSON (Rotated a) where
+  parseJSON = genericParseJSON defaultOptions
+
+-- | Resource a craftsman requires
+craftsmanResource :: Craftsman -> Resource
+craftsmanResource = \case
+  Potter        -> Clay
+  IvoryCarver   -> Ivory
+  WoodCarver    -> Wood
+  DiamondCutter -> Diamonds
+
+  VesselMaker   -> Clay
+  ThroneMaker   -> Wood
+  Sculptor      -> Wood
+
+-- | Associated Craftsman for tier 2 Craftsmen
+craftsmanAssociatedCraftsman :: Craftsman -> Maybe Craftsman
+craftsmanAssociatedCraftsman = \case
+  VesselMaker -> Just Potter
+  ThroneMaker -> Just IvoryCarver
+  Sculptor    -> Just WoodCarver
+  _           -> Nothing
+
+-- | Dimensions of placed Craftsmen. Width x Height.
+craftsmanDimensions :: Craftsman -> (Natural, Natural)
+craftsmanDimensions = \case
+  Potter        -> (1, 2)
+  IvoryCarver   -> (2, 2)
+  WoodCarver    -> (1, 2)
+  DiamondCutter -> (2, 2)
+  -- * Secondary
+  VesselMaker   -> (2, 2)
+  ThroneMaker   -> (1, 2)
+  Sculptor      -> (2, 2)
+
+rotatedDimensions :: Rotated Craftsman -> (Natural, Natural)
+rotatedDimensions (UnRotated c) = craftsmanDimensions c
+rotatedDimensions (Rotated   c) = swap (craftsmanDimensions c)
 
 data PrimaryOrSecondary = Primary | Secondary
 
@@ -177,6 +235,14 @@ specialistVR = \case
   Builder _    -> 2
   Herd    _    -> 6
 
+allSpecialists :: S.Set Specialist
+allSpecialists = S.fromList [Shaman, RainCeremony, Herd 0, Builder 0, Nomads]
+
+data Activation = BuilderActive | None
+  deriving (Show)
+
+deriveBoth defaultOptions ''Activation
+
 data God
   = Shadipinyi
   -- ^ First plaque in Generosity of Kings
@@ -205,6 +271,22 @@ data God
     deriving (Generic, Show, Eq, Ord)
 
 deriveBoth defaultOptions ''God
+
+allGods :: [God]
+allGods =
+  [ Anansi
+  , Atete
+  , Dziva
+  , Elegua
+  , Engai
+  , Eshu
+  , Gu
+  , Obatala
+  , Qamata 0
+  , Shadipinyi
+  , TsuiGoab
+  , Xango
+  ]
 
 -- Victory Requirement for a god
 godVR :: God -> Int
@@ -235,8 +317,6 @@ instance Semigroup Points where
 instance Monoid Points where
   mempty = Points 0 0
 
--- Little idea: this could be encoded as a Monoid and state changes could be
--- encoded as mempty{ change }. could the whole game be done that way?
 data Player = Player
   { playerInfo               :: Maybe PlayerInfo
   -- ^ Info about the human player
@@ -251,8 +331,8 @@ data Player = Player
   -- ^ Number of cattle that a Player currently has. Start amount: 3
   , playerMonuments          :: M.Map Location Natural
   -- ^ Locations of player-owned monuments on the map, along with monument height
-  , playerCraftsmen          :: M.Map Location Craftsman
-  -- ^ Locations of player-owned craftsmen on the map (each individual owned square)
+  , playerCraftsmen          :: M.Map Location (Rotated Craftsman)
+  -- ^ Locations of player-owned craftsmen on the map
   , playerTechnologyCards    :: M.Map TechnologyCard Int
   -- ^ Player-owned technology cards, along with the price other players must
   -- pay to use them
@@ -260,30 +340,13 @@ data Player = Player
   -- ^ Player-owned specialist cards
   , playerGod                :: Maybe God
   -- ^ God a player adores
+  , playerActivations :: [Activation]
+  -- ^ Activations a player has used this round.
   } deriving (Generic, Show)
-
--- TODO: This is NOT what I want. We need to track *when* players got their VP.
-
---enrichPlayerVP :: Player -> Player
---enrichPlayerVP player@(Player {..}) =
-  --player & victoryPoints +~ fromIntegral extraVictoryPoints
- --where
-  --extraVictoryPoints = sum [monumentVP, technologyCardVP]
-  --monumentVP         = sum $ map getHeightVP (M.elems playerMonuments)
-  --technologyCardVP =
-    --sum $ map technologyCardVictoryPoints (M.keys playerTechnologyCards)
-  --getHeightVP = \case
-    --1 -> 1
-    --2 -> 3
-    --3 -> 7
-    --4 -> 13
-    --5 -> 21
-    --_ -> error "Height invalid!"
 
 instance Semigroup Player where
   p1 <> p2 = Player
     { playerInfo = on (<|>) playerInfo p1 p2
-    --- ^ TODO: This may not be needed
     , playerVictoryRequirement = on (<>) playerVictoryRequirement p1 p2
     , playerVictoryPoints = on (<>) playerVictoryPoints p1 p2
     , playerEmpire = on (<|>) playerEmpire p1 p2
@@ -293,6 +356,7 @@ instance Semigroup Player where
     , playerTechnologyCards = on (M.unionWith (+)) playerTechnologyCards p1 p2
     , playerSpecialists = on (<>) playerSpecialists p1 p2
     , playerGod = on (<|>) playerGod p1 p2
+    , playerActivations = playerActivations p2
     }
 
 instance Monoid Player where
@@ -307,6 +371,7 @@ instance Monoid Player where
     , playerTechnologyCards = mempty
     , playerSpecialists = mempty
     , playerGod = Nothing
+    , playerActivations = mempty
     }
 
 deriveBoth (unPrefix "player") ''Player
@@ -402,11 +467,16 @@ data Game = Game
   -- ^ Current Round state
   , gameMapLayout :: Maybe MapLayout
   -- ^ Layout of the Map
-  , gameCraftsmen :: M.Map Craftsman (S.Set TechnologyCard)
+  , gameCraftsmen :: M.Map Craftsman [TechnologyCard]
   -- ^ Remaining Craftsmen of each type
+  , gameGods :: S.Set God
+  -- ^ Remaining Gods
+  , gameSpecialists :: S.Set Specialist
+  -- ^ Remaining Specialists
   , gameWinner    :: Maybe PlayerId
-  -- ^ Current step of the game (cycles whenever current player cycles)
+  -- ^ PlayerId of the winner of the game, if any.
   , gameStep :: Natural
+  -- ^ Current step of the game (cycles whenever current player cycles)
   } deriving (Generic, Show)
 
 instance Semigroup Game where
@@ -415,41 +485,17 @@ instance Semigroup Game where
     , gameRound = on (<>) gameRound g1 g2
     , gameMapLayout = on appendLast gameMapLayout g1 g2
     , gameCraftsmen = on (M.unionWith (<>)) gameCraftsmen g1 g2
+    , gameGods = on (<>) gameGods g1 g2
+    , gameSpecialists = on (<>) gameSpecialists g1 g2
     , gameWinner = on (<|>) gameWinner g1 g2
     , gameStep = on (+) gameStep g1 g2
     }
 
 instance Monoid Game where
-  mempty = Game mempty mempty Nothing mempty Nothing 0
+  mempty = Game mempty mempty Nothing mempty mempty mempty Nothing 0
 
 deriveBoth (unPrefix "game") ''Game
 makeLensesWith camelCaseFields ''Game
-
--- TODO: I don't love this function, but it does the job for now.
--- enrichPlayersVP :: Game -> Game
---enrichPlayersVP game = game & players %~ fmap enrichPlayerVP
-
--- TODO: enrichPlayersVR
-
--- | Resource a craftsman requires
-craftsmanResource :: Craftsman -> Resource
-craftsmanResource = \case
-  Potter        -> Clay
-  IvoryCarver   -> Ivory
-  WoodCarver    -> Wood
-  DiamondCutter -> Diamonds
-
-  VesselMaker   -> Clay
-  ThroneMaker   -> Wood
-  Sculptor      -> Wood
-
--- | Associated Craftsman for tier 2 Craftsmen
-craftsmanAssociatedCraftsman :: Craftsman -> Maybe Craftsman
-craftsmanAssociatedCraftsman = \case
-  VesselMaker -> Just Potter
-  ThroneMaker -> Just IvoryCarver
-  Sculptor    -> Just WoodCarver
-  _           -> Nothing
 
 -- * Pure functions from game to game
 

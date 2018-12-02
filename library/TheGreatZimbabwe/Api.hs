@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -91,12 +92,23 @@ routes pool = do
           Just (Right (game, gameView)) -> do
             -- TODO:
             -- validatePlayerOwnsCommand c
+            -- TODO: Don't allow commit of partial religion and culture action
+            -- (require 'end') (this can probably be noted in the textarea too)
 
-            when (not preview) $ do
-              void $ runDB pool $ Command.insertGameCommand (entityKey game)
-                                                            (entityKey user)
-                                                            now
-                                                            command
+            let
+              saveCommand = void $ runDB pool $ Command.insertGameCommand
+                (entityKey game)
+                (entityKey user)
+                now
+                command
+              shouldSave = not preview && case command of
+                  -- Religion and culture commands must explicitly be ended.
+                ReligionAndCultureCommand ReligionAndCultureMultiCommand {..}
+                  -> religionAndCultureMultiCommandEnd
+                _ -> True
+
+
+            when shouldSave saveCommand
             status ok200 *> json gameView
 
   Scotty.post "/new-game" $ do

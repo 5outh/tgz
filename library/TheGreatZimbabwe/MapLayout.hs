@@ -34,7 +34,7 @@ data Tiles9 = Tiles9
   }
 
 mkLocation :: Char -> Natural -> Location
-mkLocation c n = Location n (pure c)
+mkLocation c n = Location n c
 
 q1Locations :: [Location]
 q1Locations = mkLocation <$> ['a' .. 'f'] <*> [1 .. 6]
@@ -89,30 +89,6 @@ fromTiles4 Tiles4 {..} =
     ++ zip q2Locations (concat (getTile tiles4Tile2))
     ++ zip q4Locations (concat (getTile tiles4Tile3))
     ++ zip q5Locations (concat (getTile tiles4Tile4))
-
-printMapLayout :: MapLayout -> IO ()
-printMapLayout (MapLayout layout) = do
-  let xs = [1 .. 18]
-      ys = map pure ['a' .. 'r']
-
-  for_ ys $ \y' -> do
-    let str = flip concatMap xs $ \x' ->
-          let loc = "" -- y : show x <> ": "
-              chr = case M.lookup (Location x' y') layout of
-                Nothing -> ' '
-                Just c  -> case c of
-                  Water     -> 'O'
-                  Land land -> case land of
-                    StartingArea      -> 'S'
-                    BlankLand         -> 'E'
-                    Resource resource -> case resource of
-                      Clay     -> 'C'
-                      Wood     -> 'W'
-                      Ivory    -> 'I'
-                      Diamonds -> 'D'
-          in  loc ++ [chr] ++ " "
-
-    putStrLn str
 
 twoPlayers :: IO MapLayout
 twoPlayers = do

@@ -28,6 +28,8 @@ newGame playerList = GameEvent <$> do
     Left  err    -> pure (Left err)
     Right layout -> do
       playerOrder <- shuffleM $ map fst playerList
+      gameGods    <- S.fromList <$> shuffleM (take 8 allGods)
+
       let newPlayer playerInfo' = mempty
             { playerInfo               = Just playerInfo'
             , playerVictoryRequirement = mempty { pointsPoints = 20 }
@@ -49,13 +51,14 @@ newGame playerList = GameEvent <$> do
               }
             , roundCurrentPhase           = Just PreSetup
             }
-          gameCraftsmen = newGameCraftsmen
-          gameWinner    = Nothing
-          gameMapLayout = Just layout
-          gameStep      = 0
+          gameSpecialists = allSpecialists
+          gameCraftsmen   = newGameCraftsmen
+          gameWinner      = Nothing
+          gameMapLayout   = Just layout
+          gameStep        = 0
       pure $ Right Game {..}
 
-newGameCraftsmen :: M.Map Craftsman (S.Set TechnologyCard)
+newGameCraftsmen :: M.Map Craftsman [TechnologyCard]
 newGameCraftsmen = M.fromList
   [ Potter .: potters
   , IvoryCarver .: ivoryCarvers
@@ -66,39 +69,39 @@ newGameCraftsmen = M.fromList
   , Sculptor .: sculptors
   ]
  where
-  (.:)    = (,)
+  (.:) = (,)
   -- VR/VP/Cost
-  potters = S.fromList
+  potters =
     [ TechnologyCard "Potter1" Potter 3 1 2
     , TechnologyCard "Potter2" Potter 4 1 2
     ]
 
-  ivoryCarvers = S.fromList
+  ivoryCarvers =
     [ TechnologyCard "IvoryCarver1" IvoryCarver 2 1 2
     , TechnologyCard "IvoryCarver2" IvoryCarver 3 1 2
     ]
 
-  woodCarvers = S.fromList
+  woodCarvers =
     [ TechnologyCard "WoodCarver1" WoodCarver 3 1 2
     , TechnologyCard "WoodCarver2" WoodCarver 4 1 2
     ]
 
-  diamondCutters = S.fromList
+  diamondCutters =
     [ TechnologyCard "DiamondCutter1" DiamondCutter 1 3 10
     , TechnologyCard "DiamondCutter1" DiamondCutter 2 3 10
     ]
 
-  vesselMakers = S.fromList
+  vesselMakers =
     [ TechnologyCard "VesselMaker1" VesselMaker 3 2 4
     , TechnologyCard "VesselMaker2" VesselMaker 4 2 4
     ]
 
-  throneMakers = S.fromList
+  throneMakers =
     [ TechnologyCard "ThroneMaker1" ThroneMaker 3 2 4
     , TechnologyCard "ThroneMaker1" ThroneMaker 4 2 4
     ]
 
-  sculptors = S.fromList
+  sculptors =
     [ TechnologyCard "Sculptor1" Sculptor 3 2 4
     , TechnologyCard "Sculptor1" Sculptor 4 2 4
     ]
