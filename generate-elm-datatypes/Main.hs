@@ -45,6 +45,7 @@ main = do
     , DefineElm (Proxy :: Proxy UseSpecialist)
     , DefineElm (Proxy :: Proxy ReligionAndCultureCommand3)
     , DefineElm (Proxy :: Proxy RaiseMonumentCommand)
+    , DefineElm (Proxy :: Proxy ReligionAndCultureMultiCommand)
     -- Database reps
     , DefineElm (Proxy :: Proxy DB.GameView)
     , DefineElm (Proxy :: Proxy DB.UserView)

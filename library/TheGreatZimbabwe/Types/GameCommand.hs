@@ -43,7 +43,6 @@ data GameCommand
   | Bid Natural
   | Pass
   | ReligionAndCultureCommand ReligionAndCultureMultiCommand
-  | End
   -- ^ Required to end a religion and culture command. Does nothing otherwise.
   deriving (Generic, Show)
 

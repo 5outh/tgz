@@ -514,7 +514,6 @@ type GameCommand  =
     | Bid Int
     | Pass 
     | ReligionAndCultureCommand ReligionAndCultureMultiCommand
-    | End 
 
 jsonDecGameCommand : Json.Decode.Decoder ( GameCommand )
 jsonDecGameCommand =
@@ -524,7 +523,6 @@ jsonDecGameCommand =
             , ("Bid", Json.Decode.lazy (\_ -> Json.Decode.map Bid (Json.Decode.int)))
             , ("Pass", Json.Decode.lazy (\_ -> Json.Decode.succeed Pass))
             , ("ReligionAndCultureCommand", Json.Decode.lazy (\_ -> Json.Decode.map ReligionAndCultureCommand (jsonDecReligionAndCultureMultiCommand)))
-            , ("End", Json.Decode.lazy (\_ -> Json.Decode.succeed End))
             ]
     in  decodeSumObjectWithSingleField  "GameCommand" jsonDecDictGameCommand
 
@@ -536,7 +534,6 @@ jsonEncGameCommand  val =
                     Bid v1 -> ("Bid", encodeValue (Json.Encode.int v1))
                     Pass  -> ("Pass", encodeValue (Json.Encode.list identity []))
                     ReligionAndCultureCommand v1 -> ("ReligionAndCultureCommand", encodeValue (jsonEncReligionAndCultureMultiCommand v1))
-                    End  -> ("End", encodeValue (Json.Encode.list identity []))
     in encodeSumObjectWithSingleField keyval val
 
 
@@ -680,6 +677,32 @@ jsonEncRaiseMonumentCommand  val =
                     UseHub v1 -> ("UseHub", encodeValue (jsonEncLocation v1))
                     UseCraftsman v1 v2 -> ("UseCraftsman", encodeValue (Json.Encode.list identity [jsonEncLocation v1, jsonEncLocation v2]))
     in encodeSumObjectWithSingleField keyval val
+
+
+
+type alias ReligionAndCultureMultiCommand  =
+   { action1: (Maybe ReligionAndCultureCommand1)
+   , action2: (Maybe UseSpecialist)
+   , action3: (Maybe ReligionAndCultureCommand3)
+   , end: Bool
+   }
+
+jsonDecReligionAndCultureMultiCommand : Json.Decode.Decoder ( ReligionAndCultureMultiCommand )
+jsonDecReligionAndCultureMultiCommand =
+   Json.Decode.succeed (\paction1 paction2 paction3 pend -> {action1 = paction1, action2 = paction2, action3 = paction3, end = pend})
+   |> fnullable "action1" (jsonDecReligionAndCultureCommand1)
+   |> fnullable "action2" (jsonDecUseSpecialist)
+   |> fnullable "action3" (jsonDecReligionAndCultureCommand3)
+   |> required "end" (Json.Decode.bool)
+
+jsonEncReligionAndCultureMultiCommand : ReligionAndCultureMultiCommand -> Value
+jsonEncReligionAndCultureMultiCommand  val =
+   Json.Encode.object
+   [ ("action1", (maybeEncode (jsonEncReligionAndCultureCommand1)) val.action1)
+   , ("action2", (maybeEncode (jsonEncUseSpecialist)) val.action2)
+   , ("action3", (maybeEncode (jsonEncReligionAndCultureCommand3)) val.action3)
+   , ("end", Json.Encode.bool val.end)
+   ]
 
 
 

@@ -1,5 +1,6 @@
 module ApiTypes exposing
-    ( Empire(..)
+    ( Craftsman(..)
+    , Empire(..)
     , EmpirePlaque(..)
     , Game
     , GameView
@@ -11,6 +12,8 @@ module ApiTypes exposing
     , Phase(..)
     , Player
     , PlayerInfo
+    , Rotated(..)
+    , Specialist(..)
     , Square(..)
     , UserView
     , arbitraryDict
@@ -24,10 +27,14 @@ module ApiTypes exposing
     , decodePlayerInfo
     , decodeSquare
     , decodeUserView
+    , encodeCraftsman
     , encodeEmpire
+    , encodeGod
     , encodeLocation
     , encodeMapLayout
     , encodeMonuments
+    , encodeRotated
+    , encodeSpecialist
     , encodeUserView
     , intDict
     , showEmpire
