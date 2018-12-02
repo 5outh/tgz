@@ -5,10 +5,11 @@ module Main where
 import           Data.Proxy
 import           Elm.Derive
 import           Elm.Module
-import           System.IO                          (writeFile)
-import qualified TheGreatZimbabwe.Database.Game     as DB
-import qualified TheGreatZimbabwe.Database.User     as DB
+import           System.IO                           (writeFile)
+import qualified TheGreatZimbabwe.Database.Game      as DB
+import qualified TheGreatZimbabwe.Database.User      as DB
 import           TheGreatZimbabwe.Error
+import           TheGreatZimbabwe.ReligionAndCulture
 import           TheGreatZimbabwe.Types
 import           TheGreatZimbabwe.Types.GameCommand
 
@@ -40,6 +41,10 @@ main = do
     , DefineElm (Proxy :: Proxy GameError)
     , DefineElm (Proxy :: Proxy Points)
     , DefineElm (Proxy :: Proxy EmpirePlaque)
+    , DefineElm (Proxy :: Proxy ReligionAndCultureCommand1)
+    , DefineElm (Proxy :: Proxy UseSpecialist)
+    , DefineElm (Proxy :: Proxy ReligionAndCultureCommand3)
+    , DefineElm (Proxy :: Proxy RaiseMonumentCommand)
     -- Database reps
     , DefineElm (Proxy :: Proxy DB.GameView)
     , DefineElm (Proxy :: Proxy DB.UserView)

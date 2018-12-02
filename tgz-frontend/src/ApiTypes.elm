@@ -3,12 +3,12 @@ module ApiTypes exposing
     , EmpirePlaque(..)
     , Game
     , GameView
-    , Phase(..)
     , GenerosityOfKingsState
     , God(..)
     , Land(..)
     , Location
     , MapLayout
+    , Phase(..)
     , Player
     , PlayerInfo
     , Square(..)
@@ -69,7 +69,7 @@ decodeGame =
     Decode.succeed (\a b c d -> { players = a, mapLayout = b, round = c, step = d })
         |> required "players" (intDict decodePlayer)
         |> required "map_layout" decodeMapLayout
-        |> required "round" jsonDecRound
+        |> required "round" decodeRound
         |> required "step" Decode.int
 
 
@@ -127,10 +127,10 @@ decodePlayer =
 decodeEmpire : Decoder Empire
 decodeEmpire =
     let
-        jsonDecDictEmpire =
+        decodeDictEmpire =
             Dict.fromList [ ( "Kilwa", Kilwa ), ( "Mutapa", Mutapa ), ( "Zulu", Zulu ), ( "Lozi", Lozi ), ( "Mapungubwe", Mapungubwe ) ]
     in
-    decodeSumUnaries "Empire" jsonDecDictEmpire
+    decodeSumUnaries "Empire" decodeDictEmpire
 
 
 encodeEmpire : Empire -> Value
@@ -155,7 +155,7 @@ encodeEmpire val =
 decodeGod : Decoder God
 decodeGod =
     let
-        jsonDecDictGod =
+        decodeDictGod =
             Dict.fromList
                 [ ( "Shadipinyi", Decode.lazy (\_ -> Decode.succeed Shadipinyi) )
                 , ( "Elegua", Decode.lazy (\_ -> Decode.succeed Elegua) )
@@ -171,7 +171,51 @@ decodeGod =
                 , ( "Xango", Decode.lazy (\_ -> Decode.succeed Xango) )
                 ]
     in
-    decodeSumObjectWithSingleField "God" jsonDecDictGod
+    decodeSumObjectWithSingleField "God" decodeDictGod
+
+
+encodeGod : God -> Value
+encodeGod val =
+    let
+        keyval v =
+            case v of
+                Shadipinyi ->
+                    ( "Shadipinyi", encodeValue (Encode.list identity []) )
+
+                Elegua ->
+                    ( "Elegua", encodeValue (Encode.list identity []) )
+
+                Dziva ->
+                    ( "Dziva", encodeValue (Encode.list identity []) )
+
+                Eshu ->
+                    ( "Eshu", encodeValue (Encode.list identity []) )
+
+                Gu ->
+                    ( "Gu", encodeValue (Encode.list identity []) )
+
+                Obatala ->
+                    ( "Obatala", encodeValue (Encode.list identity []) )
+
+                Atete ->
+                    ( "Atete", encodeValue (Encode.list identity []) )
+
+                TsuiGoab ->
+                    ( "TsuiGoab", encodeValue (Encode.list identity []) )
+
+                Anansi ->
+                    ( "Anansi", encodeValue (Encode.list identity []) )
+
+                Qamata v1 ->
+                    ( "Qamata", encodeValue (Encode.int v1) )
+
+                Engai ->
+                    ( "Engai", encodeValue (Encode.list identity []) )
+
+                Xango ->
+                    ( "Xango", encodeValue (Encode.list identity []) )
+    in
+    encodeSumObjectWithSingleField keyval val
 
 
 type alias PlayerInfo =
@@ -277,13 +321,13 @@ type Square
 decodeSquare : Decoder Square
 decodeSquare =
     let
-        jsonDecDictSquare =
+        decodeDictSquare =
             Dict.fromList
                 [ ( "Water", Decode.lazy (\_ -> Decode.succeed Water) )
                 , ( "Land", Decode.lazy (\_ -> Decode.map Land decodeLand) )
                 ]
     in
-    decodeSumObjectWithSingleField "Square" jsonDecDictSquare
+    decodeSumObjectWithSingleField "Square" decodeDictSquare
 
 
 encodeSquare : Square -> Value
@@ -309,14 +353,14 @@ type Land
 decodeLand : Decoder Land
 decodeLand =
     let
-        jsonDecDictLand =
+        decodeDictLand =
             Dict.fromList
                 [ ( "StartingArea", Decode.lazy (\_ -> Decode.succeed StartingArea) )
                 , ( "Resource", Decode.lazy (\_ -> Decode.map Resource decodeResource) )
                 , ( "BlankLand", Decode.lazy (\_ -> Decode.succeed BlankLand) )
                 ]
     in
-    decodeSumObjectWithSingleField "Land" jsonDecDictLand
+    decodeSumObjectWithSingleField "Land" decodeDictLand
 
 
 encodeLand : Land -> Value
@@ -346,10 +390,10 @@ type Resource
 decodeResource : Decoder Resource
 decodeResource =
     let
-        jsonDecDictResource =
+        decodeDictResource =
             Dict.fromList [ ( "Clay", Clay ), ( "Wood", Wood ), ( "Ivory", Ivory ), ( "Diamonds", Diamonds ) ]
     in
-    decodeSumNullaries "Resource" jsonDecDictResource
+    decodeSumNullaries "Resource" decodeDictResource
 
 
 encodeResource : Resource -> Value
@@ -500,8 +544,8 @@ type alias Round =
     }
 
 
-jsonDecRound : Decode.Decoder Round
-jsonDecRound =
+decodeRound : Decode.Decoder Round
+decodeRound =
     Decode.succeed
         (\pplayers pcurrent_player pused_markers pgenerosity_of_kings_state pcurrent_phase ->
             { players = pplayers
@@ -513,9 +557,9 @@ jsonDecRound =
         )
         |> required "players" (Decode.list Decode.int)
         |> fnullable "current_player" Decode.int
-        |> required "used_markers" (Decode.list (Decode.map2 tuple2 (Decode.index 0 decodeLocation) (Decode.index 1 jsonDecUsedMarker)))
-        |> required "generosity_of_kings_state" jsonDecGenerosityOfKingsState
-        |> fnullable "current_phase" jsonDecPhase
+        |> required "used_markers" (Decode.list (Decode.map2 tuple2 (Decode.index 0 decodeLocation) (Decode.index 1 decodeUsedMarker)))
+        |> required "generosity_of_kings_state" decodeGenerosityOfKingsState
+        |> fnullable "current_phase" decodePhase
 
 
 type Phase
@@ -527,13 +571,13 @@ type Phase
     | LetUsCompareMythologies
 
 
-jsonDecPhase : Decode.Decoder Phase
-jsonDecPhase =
+decodePhase : Decode.Decoder Phase
+decodePhase =
     let
-        jsonDecDictPhase =
+        decodeDictPhase =
             Dict.fromList [ ( "PreSetup", PreSetup ), ( "Setup", Setup ), ( "GenerosityOfKings", GenerosityOfKings ), ( "ReligionAndCulture", ReligionAndCulture ), ( "Revenues", Revenues ), ( "LetUsCompareMythologies", LetUsCompareMythologies ) ]
     in
-    decodeSumUnaries "Phase" jsonDecDictPhase
+    decodeSumUnaries "Phase" decodeDictPhase
 
 
 type UsedMarker
@@ -542,13 +586,13 @@ type UsedMarker
     | UsedTwice
 
 
-jsonDecUsedMarker : Decode.Decoder UsedMarker
-jsonDecUsedMarker =
+decodeUsedMarker : Decode.Decoder UsedMarker
+decodeUsedMarker =
     let
-        jsonDecDictUsedMarker =
+        decodeDictUsedMarker =
             Dict.fromList [ ( "NotUsed", NotUsed ), ( "Used", Used ), ( "UsedTwice", UsedTwice ) ]
     in
-    decodeSumUnaries "UsedMarker" jsonDecDictUsedMarker
+    decodeSumUnaries "UsedMarker" decodeDictUsedMarker
 
 
 type EmpirePlaque
@@ -576,62 +620,269 @@ type alias GenerosityOfKingsState =
     }
 
 
-jsonDecGenerosityOfKingsState : Decode.Decoder GenerosityOfKingsState
-jsonDecGenerosityOfKingsState =
+decodeGenerosityOfKingsState : Decode.Decoder GenerosityOfKingsState
+decodeGenerosityOfKingsState =
     Decode.succeed (\pplaques pcattlePool plastBid pplayersPassed -> { plaques = pplaques, cattlePool = pcattlePool, lastBid = plastBid, playersPassed = pplayersPassed })
         |> required "plaques" (Decode.list decodeEmpirePlaque)
         |> required "cattle_pool" Decode.int
         |> fnullable "last_bid" Decode.int
         |> required "players_passed" (Decode.list Decode.int)
 
+
+
 -- Religion and Culture types
 
-type Craftsman
-  -- * Primary
-  = Potter
-  | IvoryCarver
-  | WoodCarver
-  | DiamondCutter
-  -- * Secondary
-  | VesselMaker
-  | ThroneMaker
-  | Sculptor
+
+type
+    Craftsman
+    -- * Primary
+    = Potter
+    | IvoryCarver
+    | WoodCarver
+    | DiamondCutter
+      -- * Secondary
+    | VesselMaker
+    | ThroneMaker
+    | Sculptor
+
 
 type Specialist
-  = Shaman
-  -- ^ May place one resource for 2 cattle (additional action type)
-  | RainCeremony
-  -- ^ May place one water tile for 3 cattle
-  | Herd Int
-  -- ^ May pay 2 cattle to this card to gain 1 cattle from the common stock.
-  -- Use at most 3 times per turn.
-  | Builder Int
-  -- ^ Pay 2 cattle to activate this turn.
-  -- If active, you pay the first two cattle of each newly placed craftsman to
-  -- this card.
-  | Nomads
-  -- ^ Pay 2 cattle to ignore zoning restrictions when building a new monument
+    = Shaman
+      -- ^ May place one resource for 2 cattle (additional action type)
+    | RainCeremony
+      -- ^ May place one water tile for 3 cattle
+    | Herd Int
+      -- ^ May pay 2 cattle to this card to gain 1 cattle from the common stock.
+      -- Use at most 3 times per turn.
+    | Builder Int
+      -- ^ Pay 2 cattle to activate this turn.
+      -- If active, you pay the first two cattle of each newly placed craftsman to
+      -- this card.
+    | Nomads
 
-type Rotated a = Rotated | Unmoved a
 
-type RaiseMonumentCommand
-  = UseHub Location
-  -- ^ Use a hub at some location, utilizing the resource at another location
-  | UseCraftsman Location Location
-  -- ^ Use a craftsman at some location, utilizing the resource at another location
 
-type ReligionAndCultureCommand1 = ChooseGod God | ChooseSpecialist Specialist
+-- ^ Pay 2 cattle to ignore zoning restrictions when building a new monument
 
-type UseSpecialist = UseSpecialist Specialist
+
+type Rotated a
+    = Rotated a
+    | UnRotated a
+
+
+encodeRotated : (a -> Value) -> Rotated a -> Value
+encodeRotated encodeA val =
+    let
+        keyval v =
+            case v of
+                UnRotated v1 ->
+                    ( "UnRotated", encodeValue (encodeA v1) )
+
+                Rotated v1 ->
+                    ( "Rotated", encodeValue (encodeA v1) )
+    in
+    encodeSumObjectWithSingleField keyval val
+
+
+decodeRotated : Decode.Decoder a -> Decode.Decoder (Rotated a)
+decodeRotated aDecoder =
+    let
+        rotatedDict =
+            Dict.fromList
+                [ ( "UnRotated", Decode.lazy (\_ -> Decode.map UnRotated aDecoder) )
+                , ( "Rotated", Decode.lazy (\_ -> Decode.map Rotated aDecoder) )
+                ]
+    in
+    decodeSumObjectWithSingleField "Rotated" rotatedDict
+
+
+type ReligionAndCultureCommand1
+    = ChooseGod God
+    | ChooseSpecialist Specialist
+
+
+decodeReligionAndCultureCommand1 : Decode.Decoder ReligionAndCultureCommand1
+decodeReligionAndCultureCommand1 =
+    let
+        decodeDictReligionAndCultureCommand1 =
+            Dict.fromList
+                [ ( "ChooseGod", Decode.lazy (\_ -> Decode.map ChooseGod decodeGod) )
+                , ( "ChooseSpecialist", Decode.lazy (\_ -> Decode.map ChooseSpecialist decodeSpecialist) )
+                ]
+    in
+    decodeSumObjectWithSingleField "ReligionAndCultureCommand1" decodeDictReligionAndCultureCommand1
+
+
+encodeReligionAndCultureCommand1 : ReligionAndCultureCommand1 -> Value
+encodeReligionAndCultureCommand1 val =
+    let
+        keyval v =
+            case v of
+                ChooseGod v1 ->
+                    ( "ChooseGod", encodeValue (encodeGod v1) )
+
+                ChooseSpecialist v1 ->
+                    ( "ChooseSpecialist", encodeValue (encodeSpecialist v1) )
+    in
+    encodeSumObjectWithSingleField keyval val
+
+
+type UseSpecialist
+    = UseSpecialist Specialist
+
+
+decodeUseSpecialist : Decode.Decoder UseSpecialist
+decodeUseSpecialist =
+    Decode.lazy (\_ -> Decode.map UseSpecialist decodeSpecialist)
+
+
+encodeUseSpecialist : UseSpecialist -> Value
+encodeUseSpecialist (UseSpecialist v1) =
+    encodeSpecialist v1
+
 
 type ReligionAndCultureCommand3
-  = BuildMonuments (List Location)
-  | PlaceCraftsmen (List (Location, Rotated Craftsman))
-  | RaiseMonuments (List (Location, List RaiseMonumentCommand))
+    = BuildMonuments (List Location)
+    | PlaceCraftsmen (List ( Location, Rotated Craftsman ))
+    | RaiseMonuments (List ( Location, List RaiseMonumentCommand ))
 
-type alias ReligionAndCultureMultiCommand =
-  { religionAndCultureMultiCommandAction1 : Maybe ReligionAndCultureCommand1
-  , religionAndCultureMultiCommandAction2 : Maybe UseSpecialist
-  , religionAndCultureMultiCommandAction3 : Maybe ReligionAndCultureCommand3
-  , religionAndCultureMultiCommandEnd     : Bool
-  }
+
+decodeReligionAndCultureCommand3 : Decode.Decoder ReligionAndCultureCommand3
+decodeReligionAndCultureCommand3 =
+    let
+        decodeDictReligionAndCultureCommand3 =
+            Dict.fromList
+                [ ( "BuildMonuments", Decode.lazy (\_ -> Decode.map BuildMonuments (Decode.list decodeLocation)) )
+                , ( "PlaceCraftsmen", Decode.lazy (\_ -> Decode.map PlaceCraftsmen (Decode.list (Decode.map2 tuple2 (Decode.index 0 decodeLocation) (Decode.index 1 (decodeRotated decodeCraftsman))))) )
+                , ( "RaiseMonuments", Decode.lazy (\_ -> Decode.map RaiseMonuments (Decode.list (Decode.map2 tuple2 (Decode.index 0 decodeLocation) (Decode.index 1 (Decode.list decodeRaiseMonumentCommand))))) )
+                ]
+    in
+    decodeSumObjectWithSingleField "ReligionAndCultureCommand3" decodeDictReligionAndCultureCommand3
+
+
+encodeReligionAndCultureCommand3 : ReligionAndCultureCommand3 -> Value
+encodeReligionAndCultureCommand3 val =
+    let
+        keyval v =
+            case v of
+                BuildMonuments v1 ->
+                    ( "BuildMonuments", encodeValue (Encode.list encodeLocation v1) )
+
+                PlaceCraftsmen v0 ->
+                    ( "PlaceCraftsmen", encodeValue (Encode.list (\( v1, v2 ) -> Encode.list identity [ encodeLocation v1, encodeRotated encodeCraftsman v2 ]) v0) )
+
+                RaiseMonuments v0 ->
+                    ( "RaiseMonuments", encodeValue (Encode.list (\( v1, v2 ) -> Encode.list identity [ encodeLocation v1, Encode.list encodeRaiseMonumentCommand v2 ]) v0) )
+    in
+    encodeSumObjectWithSingleField keyval val
+
+
+type RaiseMonumentCommand
+    = UseHub Location
+    | UseCraftsman Location Location
+
+
+decodeRaiseMonumentCommand : Decode.Decoder RaiseMonumentCommand
+decodeRaiseMonumentCommand =
+    let
+        decodeDictRaiseMonumentCommand =
+            Dict.fromList
+                [ ( "UseHub", Decode.lazy (\_ -> Decode.map UseHub decodeLocation) )
+                , ( "UseCraftsman", Decode.lazy (\_ -> Decode.map2 UseCraftsman (Decode.index 0 decodeLocation) (Decode.index 1 decodeLocation)) )
+                ]
+    in
+    decodeSumObjectWithSingleField "RaiseMonumentCommand" decodeDictRaiseMonumentCommand
+
+
+encodeRaiseMonumentCommand : RaiseMonumentCommand -> Value
+encodeRaiseMonumentCommand val =
+    let
+        keyval v =
+            case v of
+                UseHub v1 ->
+                    ( "UseHub", encodeValue (encodeLocation v1) )
+
+                UseCraftsman v1 v2 ->
+                    ( "UseCraftsman", encodeValue (Encode.list identity [ encodeLocation v1, encodeLocation v2 ]) )
+    in
+    encodeSumObjectWithSingleField keyval val
+
+
+decodeCraftsman : Decode.Decoder Craftsman
+decodeCraftsman =
+    let
+        decodeDictCraftsman =
+            Dict.fromList
+                [ ( "Potter", Potter )
+                , ( "IvoryCarver", IvoryCarver )
+                , ( "WoodCarver", WoodCarver )
+                , ( "DiamondCutter", DiamondCutter )
+                , ( "VesselMaker", VesselMaker )
+                , ( "ThroneMaker", ThroneMaker )
+                , ( "Sculptor", Sculptor )
+                ]
+    in
+    decodeSumUnaries "Craftsman" decodeDictCraftsman
+
+
+encodeCraftsman : Craftsman -> Value
+encodeCraftsman val =
+    case val of
+        Potter ->
+            Encode.string "Potter"
+
+        IvoryCarver ->
+            Encode.string "IvoryCarver"
+
+        WoodCarver ->
+            Encode.string "WoodCarver"
+
+        DiamondCutter ->
+            Encode.string "DiamondCutter"
+
+        VesselMaker ->
+            Encode.string "VesselMaker"
+
+        ThroneMaker ->
+            Encode.string "ThroneMaker"
+
+        Sculptor ->
+            Encode.string "Sculptor"
+
+
+decodeSpecialist : Decode.Decoder Specialist
+decodeSpecialist =
+    let
+        decodeDictSpecialist =
+            Dict.fromList
+                [ ( "Shaman", Decode.lazy (\_ -> Decode.succeed Shaman) )
+                , ( "RainCeremony", Decode.lazy (\_ -> Decode.succeed RainCeremony) )
+                , ( "Herd", Decode.lazy (\_ -> Decode.map Herd Decode.int) )
+                , ( "Builder", Decode.lazy (\_ -> Decode.map Builder Decode.int) )
+                , ( "Nomads", Decode.lazy (\_ -> Decode.succeed Nomads) )
+                ]
+    in
+    decodeSumObjectWithSingleField "Specialist" decodeDictSpecialist
+
+
+encodeSpecialist : Specialist -> Value
+encodeSpecialist val =
+    let
+        keyval v =
+            case v of
+                Shaman ->
+                    ( "Shaman", encodeValue (Encode.list identity []) )
+
+                RainCeremony ->
+                    ( "RainCeremony", encodeValue (Encode.list identity []) )
+
+                Herd v1 ->
+                    ( "Herd", encodeValue (Encode.int v1) )
+
+                Builder v1 ->
+                    ( "Builder", encodeValue (Encode.int v1) )
+
+                Nomads ->
+                    ( "Nomads", encodeValue (Encode.list identity []) )
+    in
+    encodeSumObjectWithSingleField keyval val

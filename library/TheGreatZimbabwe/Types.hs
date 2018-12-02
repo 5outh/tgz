@@ -49,8 +49,14 @@ data Location = Location
 locationAbove :: Location -> Location
 locationAbove loc = loc { locationY = pred (locationY loc) }
 
+locationBelow :: Location -> Location
+locationBelow loc = loc { locationY = succ (locationY loc) }
+
 locationLeft :: Location -> Location
 locationLeft loc = loc { locationX = pred (locationX loc) }
+
+locationRight :: Location -> Location
+locationRight loc = loc { locationX = succ (locationX loc) }
 
 instance ToJSONKey Location where
   toJSONKey = ToJSONKeyValue toJSON toEncoding
@@ -238,8 +244,8 @@ specialistVR = \case
 allSpecialists :: S.Set Specialist
 allSpecialists = S.fromList [Shaman, RainCeremony, Herd 0, Builder 0, Nomads]
 
-data Activation = BuilderActive | None
-  deriving (Show)
+data Activation = BuilderActive | NomadsActive | None
+  deriving (Show, Eq, Ord)
 
 deriveBoth defaultOptions ''Activation
 
@@ -340,7 +346,7 @@ data Player = Player
   -- ^ Player-owned specialist cards
   , playerGod                :: Maybe God
   -- ^ God a player adores
-  , playerActivations :: [Activation]
+  , playerActivations :: S.Set Activation
   -- ^ Activations a player has used this round.
   } deriving (Generic, Show)
 
@@ -376,6 +382,11 @@ instance Monoid Player where
 
 deriveBoth (unPrefix "player") ''Player
 makeLensesWith camelCaseFields ''Player
+
+showPlayerUsername :: Player -> T.Text
+showPlayerUsername player = fromMaybe
+  "another player"
+  (usernameUsername . playerInfoUsername <$> playerInfo player)
 
 -- Note: UsedTwice only occurs when Atete is in play.
 data UsedMarker = NotUsed | Used | UsedTwice

@@ -90,15 +90,77 @@ useNomads = undefined
 buildMonument
   :: Location -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 buildMonument location playerId game = PlayerAction $ do
-  --locationIsNotBlank
-    --`impliesInvalid` ("Location " <> pprintLocation location <> " is not blank."
-                     --)
-  pure undefined
+  playerIs playerId game
+  phaseIs ReligionAndCulture game
+
+  let executeAction =
+        pure
+          $  game
+          <> setPlayer playerId
+                       (mempty { playerMonuments = M.singleton location 1 })
+          <> addVictoryPoints 1 playerId game
+
+  let mLocated = locatedAt location game
+  let invalidMessage msg =
+        invalidAction
+          $  "Can't build a monument at "
+          <> pprintLocation location
+          <> ": "
+          <> msg
+
+  -- woo! what a world
+  case mLocated of
+    Nothing      -> invalidMessage "it's off the board!"
+
+    Just located -> case located of
+      LocatedPlayerMonument player _ ->
+        invalidMessage
+          $  showPlayerUsername player
+          <> " has already built a monument there!"
+      LocatedPlayerCraftsman player _ ->
+        invalidMessage
+          $  showPlayerUsername player
+          <> " has already built a craftsman there!"
+      LocatedSquare square -> case square of
+        Water     -> invalidMessage "can't build on water!"
+        Land land -> case land of
+          StartingArea -> invalidMessage "can't build on starting area!"
+          Resource resource ->
+            invalidMessage
+              $  "can't build on resource tile: "
+              <> tshow resource
+              <> "!"
+          BlankLand -> do
+            player <- getPlayer playerId game
+            if NomadsActive `S.member` (player ^. activations)
+              then executeAction
+              else case playerMonumentAround location game of
+                Just (player, _) ->
+                  invalidMessage
+                    $ showPlayerUsername player
+                    <> " has already built a monument too close to this location!"
+                Nothing -> executeAction
 
 data Located
   = LocatedSquare Square
   | LocatedPlayerMonument Player Natural
   | LocatedPlayerCraftsman Player (Rotated Craftsman)
+
+-- TODO: Technically there can be multiples here, do we care?
+playerMonumentAround :: Location -> Game -> Maybe (Player, Natural)
+playerMonumentAround location game = asum
+  $ map (`lookupMonument` game) neighborLocations
+ where
+  neighborLocations =
+    [ locationLeft location
+    , locationRight location
+    , locationAbove location
+    , locationBelow location
+    , locationLeft (locationAbove location)
+    , locationRight (locationAbove location)
+    , locationLeft (locationBelow location)
+    , locationRight (locationBelow location)
+    ]
 
 locatedAt :: Location -> Game -> Maybe Located
 locatedAt location game =

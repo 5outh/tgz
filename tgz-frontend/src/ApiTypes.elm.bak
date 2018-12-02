@@ -21,20 +21,20 @@ jsonEncPlayerId  val = Json.Encode.int val
 
 type alias Location  =
    { x: Int
-   , y: String
+   , y: Char
    }
 
 jsonDecLocation : Json.Decode.Decoder ( Location )
 jsonDecLocation =
    Json.Decode.succeed (\px py -> {x = px, y = py})
    |> required "x" (Json.Decode.int)
-   |> required "y" (Json.Decode.string)
+   |> required "y" (jsonDecChar)
 
 jsonEncLocation : Location -> Value
 jsonEncLocation  val =
    Json.Encode.object
    [ ("x", Json.Encode.int val.x)
-   , ("y", Json.Encode.string val.y)
+   , ("y", jsonEncChar val.y)
    ]
 
 
@@ -326,44 +326,47 @@ jsonEncGod  val =
 
 type alias Player  =
    { info: (Maybe PlayerInfo)
-   , victory_requirement: Int
-   , victory_points: Int
+   , victory_requirement: Points
+   , victory_points: Points
    , empire: (Maybe Empire)
    , cattle: Int
    , monuments: (List (Location, Int))
-   , craftsmen: (List (Location, Craftsman))
+   , craftsmen: (List (Location, (Rotated Craftsman)))
    , technology_cards: (List (TechnologyCard, Int))
    , specialists: (List Specialist)
    , god: (Maybe God)
+   , activations: (List Activation)
    }
 
 jsonDecPlayer : Json.Decode.Decoder ( Player )
 jsonDecPlayer =
-   Json.Decode.succeed (\pinfo pvictory_requirement pvictory_points pempire pcattle pmonuments pcraftsmen ptechnology_cards pspecialists pgod -> {info = pinfo, victory_requirement = pvictory_requirement, victory_points = pvictory_points, empire = pempire, cattle = pcattle, monuments = pmonuments, craftsmen = pcraftsmen, technology_cards = ptechnology_cards, specialists = pspecialists, god = pgod})
+   Json.Decode.succeed (\pinfo pvictory_requirement pvictory_points pempire pcattle pmonuments pcraftsmen ptechnology_cards pspecialists pgod pactivations -> {info = pinfo, victory_requirement = pvictory_requirement, victory_points = pvictory_points, empire = pempire, cattle = pcattle, monuments = pmonuments, craftsmen = pcraftsmen, technology_cards = ptechnology_cards, specialists = pspecialists, god = pgod, activations = pactivations})
    |> fnullable "info" (jsonDecPlayerInfo)
-   |> required "victory_requirement" (Json.Decode.int)
-   |> required "victory_points" (Json.Decode.int)
+   |> required "victory_requirement" (jsonDecPoints)
+   |> required "victory_points" (jsonDecPoints)
    |> fnullable "empire" (jsonDecEmpire)
    |> required "cattle" (Json.Decode.int)
    |> required "monuments" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (Json.Decode.int))))
-   |> required "craftsmen" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (jsonDecCraftsman))))
+   |> required "craftsmen" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (jsonDecRotated (jsonDecCraftsman)))))
    |> required "technology_cards" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecTechnologyCard)) (Json.Decode.index 1 (Json.Decode.int))))
    |> required "specialists" (Json.Decode.list (jsonDecSpecialist))
    |> fnullable "god" (jsonDecGod)
+   |> required "activations" (Json.Decode.list (jsonDecActivation))
 
 jsonEncPlayer : Player -> Value
 jsonEncPlayer  val =
    Json.Encode.object
    [ ("info", (maybeEncode (jsonEncPlayerInfo)) val.info)
-   , ("victory_requirement", Json.Encode.int val.victory_requirement)
-   , ("victory_points", Json.Encode.int val.victory_points)
+   , ("victory_requirement", jsonEncPoints val.victory_requirement)
+   , ("victory_points", jsonEncPoints val.victory_points)
    , ("empire", (maybeEncode (jsonEncEmpire)) val.empire)
    , ("cattle", Json.Encode.int val.cattle)
    , ("monuments", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncLocation) v1,(Json.Encode.int) v2])) val.monuments)
-   , ("craftsmen", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncLocation) v1,(jsonEncCraftsman) v2])) val.craftsmen)
+   , ("craftsmen", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncLocation) v1,((jsonEncRotated (jsonEncCraftsman))) v2])) val.craftsmen)
    , ("technology_cards", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncTechnologyCard) v1,(Json.Encode.int) v2])) val.technology_cards)
    , ("specialists", (Json.Encode.list jsonEncSpecialist) val.specialists)
    , ("god", (maybeEncode (jsonEncGod)) val.god)
+   , ("activations", (Json.Encode.list jsonEncActivation) val.activations)
    ]
 
 
@@ -388,7 +391,7 @@ jsonEncUsedMarker  val =
 
 
 type alias GenerosityOfKingsState  =
-   { plaques: (List Empire)
+   { plaques: (List EmpirePlaque)
    , cattle_pool: Int
    , last_bid: (Maybe Int)
    , players_passed: (List PlayerId)
@@ -397,7 +400,7 @@ type alias GenerosityOfKingsState  =
 jsonDecGenerosityOfKingsState : Json.Decode.Decoder ( GenerosityOfKingsState )
 jsonDecGenerosityOfKingsState =
    Json.Decode.succeed (\pplaques pcattle_pool plast_bid pplayers_passed -> {plaques = pplaques, cattle_pool = pcattle_pool, last_bid = plast_bid, players_passed = pplayers_passed})
-   |> required "plaques" (Json.Decode.list (jsonDecEmpire))
+   |> required "plaques" (Json.Decode.list (jsonDecEmpirePlaque))
    |> required "cattle_pool" (Json.Decode.int)
    |> fnullable "last_bid" (Json.Decode.int)
    |> required "players_passed" (Json.Decode.list (jsonDecPlayerId))
@@ -405,7 +408,7 @@ jsonDecGenerosityOfKingsState =
 jsonEncGenerosityOfKingsState : GenerosityOfKingsState -> Value
 jsonEncGenerosityOfKingsState  val =
    Json.Encode.object
-   [ ("plaques", (Json.Encode.list jsonEncEmpire) val.plaques)
+   [ ("plaques", (Json.Encode.list jsonEncEmpirePlaque) val.plaques)
    , ("cattle_pool", Json.Encode.int val.cattle_pool)
    , ("last_bid", (maybeEncode (Json.Encode.int)) val.last_bid)
    , ("players_passed", (Json.Encode.list jsonEncPlayerId) val.players_passed)
@@ -472,17 +475,23 @@ type alias Game  =
    , round: Round
    , map_layout: (Maybe MapLayout)
    , craftsmen: (List (Craftsman, (List TechnologyCard)))
+   , gods: (List God)
+   , specialists: (List Specialist)
    , winner: (Maybe PlayerId)
+   , step: Int
    }
 
 jsonDecGame : Json.Decode.Decoder ( Game )
 jsonDecGame =
-   Json.Decode.succeed (\pplayers pround pmap_layout pcraftsmen pwinner -> {players = pplayers, round = pround, map_layout = pmap_layout, craftsmen = pcraftsmen, winner = pwinner})
+   Json.Decode.succeed (\pplayers pround pmap_layout pcraftsmen pgods pspecialists pwinner pstep -> {players = pplayers, round = pround, map_layout = pmap_layout, craftsmen = pcraftsmen, gods = pgods, specialists = pspecialists, winner = pwinner, step = pstep})
    |> required "players" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecPlayerId)) (Json.Decode.index 1 (jsonDecPlayer))))
    |> required "round" (jsonDecRound)
    |> fnullable "map_layout" (jsonDecMapLayout)
    |> required "craftsmen" (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecCraftsman)) (Json.Decode.index 1 (Json.Decode.list (jsonDecTechnologyCard)))))
+   |> required "gods" (Json.Decode.list (jsonDecGod))
+   |> required "specialists" (Json.Decode.list (jsonDecSpecialist))
    |> fnullable "winner" (jsonDecPlayerId)
+   |> required "step" (Json.Decode.int)
 
 jsonEncGame : Game -> Value
 jsonEncGame  val =
@@ -491,7 +500,10 @@ jsonEncGame  val =
    , ("round", jsonEncRound val.round)
    , ("map_layout", (maybeEncode (jsonEncMapLayout)) val.map_layout)
    , ("craftsmen", (Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncCraftsman) v1,((Json.Encode.list jsonEncTechnologyCard)) v2])) val.craftsmen)
+   , ("gods", (Json.Encode.list jsonEncGod) val.gods)
+   , ("specialists", (Json.Encode.list jsonEncSpecialist) val.specialists)
    , ("winner", (maybeEncode (jsonEncPlayerId)) val.winner)
+   , ("step", Json.Encode.int val.step)
    ]
 
 
@@ -499,12 +511,20 @@ jsonEncGame  val =
 type GameCommand  =
     ChooseEmpire Empire
     | PlaceStartingMonument Location
+    | Bid Int
+    | Pass 
+    | ReligionAndCultureCommand ReligionAndCultureMultiCommand
+    | End 
 
 jsonDecGameCommand : Json.Decode.Decoder ( GameCommand )
 jsonDecGameCommand =
     let jsonDecDictGameCommand = Dict.fromList
             [ ("ChooseEmpire", Json.Decode.lazy (\_ -> Json.Decode.map ChooseEmpire (jsonDecEmpire)))
             , ("PlaceStartingMonument", Json.Decode.lazy (\_ -> Json.Decode.map PlaceStartingMonument (jsonDecLocation)))
+            , ("Bid", Json.Decode.lazy (\_ -> Json.Decode.map Bid (Json.Decode.int)))
+            , ("Pass", Json.Decode.lazy (\_ -> Json.Decode.succeed Pass))
+            , ("ReligionAndCultureCommand", Json.Decode.lazy (\_ -> Json.Decode.map ReligionAndCultureCommand (jsonDecReligionAndCultureMultiCommand)))
+            , ("End", Json.Decode.lazy (\_ -> Json.Decode.succeed End))
             ]
     in  decodeSumObjectWithSingleField  "GameCommand" jsonDecDictGameCommand
 
@@ -513,6 +533,10 @@ jsonEncGameCommand  val =
     let keyval v = case v of
                     ChooseEmpire v1 -> ("ChooseEmpire", encodeValue (jsonEncEmpire v1))
                     PlaceStartingMonument v1 -> ("PlaceStartingMonument", encodeValue (jsonEncLocation v1))
+                    Bid v1 -> ("Bid", encodeValue (Json.Encode.int v1))
+                    Pass  -> ("Pass", encodeValue (Json.Encode.list identity []))
+                    ReligionAndCultureCommand v1 -> ("ReligionAndCultureCommand", encodeValue (jsonEncReligionAndCultureMultiCommand v1))
+                    End  -> ("End", encodeValue (Json.Encode.list identity []))
     in encodeSumObjectWithSingleField keyval val
 
 
@@ -534,6 +558,127 @@ jsonEncGameError  val =
     let keyval v = case v of
                     InvalidAction v1 -> ("InvalidAction", encodeValue (Json.Encode.string v1))
                     InternalError v1 -> ("InternalError", encodeValue (Json.Encode.string v1))
+    in encodeSumObjectWithSingleField keyval val
+
+
+
+type alias Points  =
+   { points: Int
+   , step: Int
+   }
+
+jsonDecPoints : Json.Decode.Decoder ( Points )
+jsonDecPoints =
+   Json.Decode.succeed (\ppoints pstep -> {points = ppoints, step = pstep})
+   |> required "points" (Json.Decode.int)
+   |> required "step" (Json.Decode.int)
+
+jsonEncPoints : Points -> Value
+jsonEncPoints  val =
+   Json.Encode.object
+   [ ("points", Json.Encode.int val.points)
+   , ("step", Json.Encode.int val.step)
+   ]
+
+
+
+type EmpirePlaque  =
+    PlayerPlaque Empire
+    | ShadipinyiPlaque 
+
+jsonDecEmpirePlaque : Json.Decode.Decoder ( EmpirePlaque )
+jsonDecEmpirePlaque =
+    let jsonDecDictEmpirePlaque = Dict.fromList
+            [ ("PlayerPlaque", Json.Decode.lazy (\_ -> Json.Decode.map PlayerPlaque (jsonDecEmpire)))
+            , ("ShadipinyiPlaque", Json.Decode.lazy (\_ -> Json.Decode.succeed ShadipinyiPlaque))
+            ]
+    in  decodeSumObjectWithSingleField  "EmpirePlaque" jsonDecDictEmpirePlaque
+
+jsonEncEmpirePlaque : EmpirePlaque -> Value
+jsonEncEmpirePlaque  val =
+    let keyval v = case v of
+                    PlayerPlaque v1 -> ("PlayerPlaque", encodeValue (jsonEncEmpire v1))
+                    ShadipinyiPlaque  -> ("ShadipinyiPlaque", encodeValue (Json.Encode.list identity []))
+    in encodeSumObjectWithSingleField keyval val
+
+
+
+type ReligionAndCultureCommand1  =
+    ChooseGod God
+    | ChooseSpecialist Specialist
+
+jsonDecReligionAndCultureCommand1 : Json.Decode.Decoder ( ReligionAndCultureCommand1 )
+jsonDecReligionAndCultureCommand1 =
+    let jsonDecDictReligionAndCultureCommand1 = Dict.fromList
+            [ ("ChooseGod", Json.Decode.lazy (\_ -> Json.Decode.map ChooseGod (jsonDecGod)))
+            , ("ChooseSpecialist", Json.Decode.lazy (\_ -> Json.Decode.map ChooseSpecialist (jsonDecSpecialist)))
+            ]
+    in  decodeSumObjectWithSingleField  "ReligionAndCultureCommand1" jsonDecDictReligionAndCultureCommand1
+
+jsonEncReligionAndCultureCommand1 : ReligionAndCultureCommand1 -> Value
+jsonEncReligionAndCultureCommand1  val =
+    let keyval v = case v of
+                    ChooseGod v1 -> ("ChooseGod", encodeValue (jsonEncGod v1))
+                    ChooseSpecialist v1 -> ("ChooseSpecialist", encodeValue (jsonEncSpecialist v1))
+    in encodeSumObjectWithSingleField keyval val
+
+
+
+type UseSpecialist  =
+    UseSpecialist Specialist
+
+jsonDecUseSpecialist : Json.Decode.Decoder ( UseSpecialist )
+jsonDecUseSpecialist =
+    Json.Decode.lazy (\_ -> Json.Decode.map UseSpecialist (jsonDecSpecialist))
+
+
+jsonEncUseSpecialist : UseSpecialist -> Value
+jsonEncUseSpecialist (UseSpecialist v1) =
+    jsonEncSpecialist v1
+
+
+
+type ReligionAndCultureCommand3  =
+    BuildMonuments (NonEmpty Location)
+    | PlaceCraftsmen (List (Location, (Rotated Craftsman)))
+    | RaiseMonuments (List (Location, (List RaiseMonumentCommand)))
+
+jsonDecReligionAndCultureCommand3 : Json.Decode.Decoder ( ReligionAndCultureCommand3 )
+jsonDecReligionAndCultureCommand3 =
+    let jsonDecDictReligionAndCultureCommand3 = Dict.fromList
+            [ ("BuildMonuments", Json.Decode.lazy (\_ -> Json.Decode.map BuildMonuments (jsonDecNonEmpty (jsonDecLocation))))
+            , ("PlaceCraftsmen", Json.Decode.lazy (\_ -> Json.Decode.map PlaceCraftsmen (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (jsonDecRotated (jsonDecCraftsman)))))))
+            , ("RaiseMonuments", Json.Decode.lazy (\_ -> Json.Decode.map RaiseMonuments (Json.Decode.list (Json.Decode.map2 tuple2 (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (Json.Decode.list (jsonDecRaiseMonumentCommand)))))))
+            ]
+    in  decodeSumObjectWithSingleField  "ReligionAndCultureCommand3" jsonDecDictReligionAndCultureCommand3
+
+jsonEncReligionAndCultureCommand3 : ReligionAndCultureCommand3 -> Value
+jsonEncReligionAndCultureCommand3  val =
+    let keyval v = case v of
+                    BuildMonuments v1 -> ("BuildMonuments", encodeValue ((jsonEncNonEmpty (jsonEncLocation)) v1))
+                    PlaceCraftsmen v1 -> ("PlaceCraftsmen", encodeValue ((Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncLocation) v1,((jsonEncRotated (jsonEncCraftsman))) v2])) v1))
+                    RaiseMonuments v1 -> ("RaiseMonuments", encodeValue ((Json.Encode.list (\(v1,v2) -> Json.Encode.list identity [(jsonEncLocation) v1,((Json.Encode.list jsonEncRaiseMonumentCommand)) v2])) v1))
+    in encodeSumObjectWithSingleField keyval val
+
+
+
+type RaiseMonumentCommand  =
+    UseHub Location
+    | UseCraftsman Location Location
+
+jsonDecRaiseMonumentCommand : Json.Decode.Decoder ( RaiseMonumentCommand )
+jsonDecRaiseMonumentCommand =
+    let jsonDecDictRaiseMonumentCommand = Dict.fromList
+            [ ("UseHub", Json.Decode.lazy (\_ -> Json.Decode.map UseHub (jsonDecLocation)))
+            , ("UseCraftsman", Json.Decode.lazy (\_ -> Json.Decode.map2 UseCraftsman (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (jsonDecLocation))))
+            ]
+    in  decodeSumObjectWithSingleField  "RaiseMonumentCommand" jsonDecDictRaiseMonumentCommand
+
+jsonEncRaiseMonumentCommand : RaiseMonumentCommand -> Value
+jsonEncRaiseMonumentCommand  val =
+    let keyval v = case v of
+                    UseHub v1 -> ("UseHub", encodeValue (jsonEncLocation v1))
+                    UseCraftsman v1 v2 -> ("UseCraftsman", encodeValue (Json.Encode.list identity [jsonEncLocation v1, jsonEncLocation v2]))
     in encodeSumObjectWithSingleField keyval val
 
 
