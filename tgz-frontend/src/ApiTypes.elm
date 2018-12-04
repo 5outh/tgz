@@ -672,8 +672,8 @@ type
 type Specialist
     = Shaman
     | RainCeremony
-    | Herd Int
-    | Builder Int
+    | Herd
+    | Builder
     | Nomads
 
 
@@ -907,34 +907,30 @@ decodeSpecialist =
     let
         decodeDictSpecialist =
             Dict.fromList
-                [ ( "Shaman", Decode.lazy (\_ -> Decode.succeed Shaman) )
-                , ( "RainCeremony", Decode.lazy (\_ -> Decode.succeed RainCeremony) )
-                , ( "Herd", Decode.lazy (\_ -> Decode.map Herd Decode.int) )
-                , ( "Builder", Decode.lazy (\_ -> Decode.map Builder Decode.int) )
-                , ( "Nomads", Decode.lazy (\_ -> Decode.succeed Nomads) )
+                [ ( "Shaman", Shaman )
+                , ( "RainCeremony", RainCeremony )
+                , ( "Herd", Herd )
+                , ( "Builder", Builder )
+                , ( "Nomads", Nomads )
                 ]
     in
-    decodeSumObjectWithSingleField "Specialist" decodeDictSpecialist
+    decodeSumUnaries "Specialist" decodeDictSpecialist
 
 
 encodeSpecialist : Specialist -> Value
 encodeSpecialist val =
-    let
-        keyval v =
-            case v of
-                Shaman ->
-                    ( "Shaman", encodeValue (Encode.list identity []) )
+    case val of
+        Shaman ->
+            Encode.string "Shaman"
 
-                RainCeremony ->
-                    ( "RainCeremony", encodeValue (Encode.list identity []) )
+        RainCeremony ->
+            Encode.string "RainCeremony"
 
-                Herd v1 ->
-                    ( "Herd", encodeValue (Encode.int v1) )
+        Herd ->
+            Encode.string "Herd"
 
-                Builder v1 ->
-                    ( "Builder", encodeValue (Encode.int v1) )
+        Builder ->
+            Encode.string "Builder"
 
-                Nomads ->
-                    ( "Nomads", encodeValue (Encode.list identity []) )
-    in
-    encodeSumObjectWithSingleField keyval val
+        Nomads ->
+            Encode.string "Nomads"

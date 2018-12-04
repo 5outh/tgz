@@ -227,8 +227,8 @@ parseSpecialist =
     oneOf
         [ succeed Shaman |. keyword "shaman"
         , succeed RainCeremony |. keyword "rain-ceremony"
-        , succeed (Herd 0) |. keyword "herd"
-        , succeed (Builder 0) |. keyword "builder"
+        , succeed Herd |. keyword "herd"
+        , succeed Builder |. keyword "builder"
         , succeed Nomads |. keyword "nomads"
         ]
 
