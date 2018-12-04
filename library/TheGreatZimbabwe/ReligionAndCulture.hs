@@ -32,8 +32,9 @@ import           TheGreatZimbabwe.Validation
 chooseGod :: God -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 chooseGod god playerId game = PlayerAction $ do
   god
-    `S.notMember`    (game ^. gods)
-    `impliesInvalid` (tshow god <> " has already been chosen by another player."
+    `S.notMember` (game ^. gods)
+    `impliesInvalid` (tshow god
+                     <> " has already been chosen by another player or is unavailable in this game."
                      )
   player <- getPlayer playerId game
 
@@ -123,6 +124,7 @@ useRainCeremony loc1 loc2 playerId game = PlayerAction $ do
   phaseIs ReligionAndCulture game
   playerHasSpecialist RainCeremony playerId game
   playerHasCattle 3 playerId game
+
   (game ^. waterTiles <= 0)
     `impliesInvalid` "There are no water tiles remaining."
 
@@ -131,7 +133,7 @@ useRainCeremony loc1 loc2 playerId game = PlayerAction $ do
       convertLocationToWater loc =
         mempty & mapLayout .~ MapLayout (M.singleton loc Water)
 
-  not (locationsAreAdjacent loc2 loc2)
+  not (locationsAreAdjacent loc1 loc2)
     `impliesInvalid` "Water must be placed in adjacent locations when using rain ceremony."
 
   convertLoc1 <- executeIfEmpty "Cannot convert to water"

@@ -111,7 +111,7 @@ type alias Player =
 
     --, technologyCards: List (TechnologyCard, Int) TODO
     -- ^ note: TechnologyCard isn't comparable, so we have to decode to a list
-    , specialists : List Specialist
+    , specialists : List ( Specialist, Int )
     , god : Maybe God
     }
 
@@ -138,7 +138,8 @@ decodePlayer =
         |> required "cattle" Decode.int
         |> required "monuments" decodeMonuments
         |> required "craftsmen" (decodeLocationDict (decodeRotated decodeCraftsman))
-        |> required "specialists" (Decode.list decodeSpecialist)
+        |> required "specialists"
+            (Decode.list (Decode.map2 tuple2 (Decode.index 0 decodeSpecialist) (Decode.index 1 Decode.int)))
         |> required "god" (Decode.maybe decodeGod)
 
 

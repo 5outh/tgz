@@ -67,10 +67,6 @@ type RaiseMonumentCommand
     | UseCraftsman Location Location
 
 
-type UseSpecialist
-    = UseSpecialist Specialist
-
-
 type ReligionAndCultureCommand1
     = ChooseGod God
     | ChooseSpecialist Specialist
@@ -88,6 +84,14 @@ type alias ReligionAndCultureMultiCommand =
     , action3 : Maybe ReligionAndCultureCommand3
     , end : Bool
     }
+
+
+type UseSpecialist
+    = UseShaman
+    | UseRainCeremony Location Location
+    | UseHerd Int
+    | UseBuilder
+    | UseNomads
 
 
 type GameCommand
@@ -212,10 +216,16 @@ parseReligionAndCultureCommand1 =
 parseUseSpecialist : Parser (Maybe UseSpecialist)
 parseUseSpecialist =
     oneOf
-        [ succeed (Just << UseSpecialist)
-            |. keyword "use-specialist"
+        [ succeed (Just UseShaman) |. keyword "shaman" |. chompUntilEndOr "\n" |. spaces
+        , succeed (Just UseBuilder) |. keyword "builder" |. chompUntilEndOr "\n" |. spaces
+        , succeed (Just UseNomads) |. keyword "nomads" |. chompUntilEndOr "\n" |. spaces
+        , succeed (Just << UseHerd) |. keyword "herd" |. spaces |= Parser.int
+        , succeed (\loc1 loc2 -> Just (UseRainCeremony loc1 loc2))
+            |. keyword "rain-ceremony"
             |. spaces
-            |= parseSpecialist
+            |= parseLocation
+            |. spaces
+            |= parseLocation
             |. chompUntilEndOr "\n"
             |. spaces
         , succeed Nothing |. spaces
@@ -347,8 +357,26 @@ encodeReligionAndCultureCommand1 val =
 
 
 encodeUseSpecialist : UseSpecialist -> Value
-encodeUseSpecialist (UseSpecialist v1) =
-    encodeSpecialist v1
+encodeUseSpecialist val =
+    let
+        keyval v =
+            case v of
+                UseShaman ->
+                    ( "UseShaman", encodeValue (Encode.list identity []) )
+
+                UseRainCeremony v1 v2 ->
+                    ( "UseRainCeremony", encodeValue (Encode.list identity [ encodeLocation v1, encodeLocation v2 ]) )
+
+                UseHerd v1 ->
+                    ( "UseHerd", encodeValue (Encode.int v1) )
+
+                UseBuilder ->
+                    ( "UseBuilder", encodeValue (Encode.list identity []) )
+
+                UseNomads ->
+                    ( "UseNomads", encodeValue (Encode.list identity []) )
+    in
+    encodeSumObjectWithSingleField keyval val
 
 
 encodeReligionAndCultureCommand3 : ReligionAndCultureCommand3 -> Value

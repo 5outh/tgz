@@ -483,8 +483,6 @@ instance Monoid Round where
 deriveBoth (unPrefix "round") ''Round
 makeLensesWith camelCaseFields ''Round
 
--- Note: unlimited cattle stock
-
 data Game = Game
   { gamePlayers   :: M.Map PlayerId Player
   -- ^ Players of the game, in unordered format.
@@ -512,7 +510,8 @@ instance Semigroup Game where
   g1 <> g2 = Game
     { gamePlayers = on (M.unionWith (<>)) gamePlayers g1 g2
     , gameRound = on (<>) gameRound g1 g2
-    , gameMapLayout = on (<>) gameMapLayout g1 g2
+    -- Need 'flip' if we want to overwrite keys in a map.
+    , gameMapLayout = on (flip (<>)) gameMapLayout g1 g2
     , gameCraftsmen = on (M.unionWith (<>)) gameCraftsmen g1 g2
     , gameGods = on (<>) gameGods g1 g2
     , gameSpecialists = on (<>) gameSpecialists g1 g2
