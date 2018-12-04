@@ -20,6 +20,7 @@ import ApiTypes as ApiTypes
         , MapLayout
         , Phase(..)
         , Player
+        , Specialist(..)
         , decodeGameView
         , encodeEmpire
         , encodeMapLayout
@@ -420,12 +421,41 @@ renderPlayer isCurrentPlayer player =
             , ul []
                 [ li [] [ text ("Empire: " ++ playerEmpire) ]
                 , li [] [ text ("God: " ++ playerGod) ]
+                , if List.isEmpty player.specialists
+                  then div [] []
+                  else
+                    li [] [ text
+                        ("Specialists: " ++ String.join ", " (List.map showSpecialist player.specialists))
+                    ]
                 , li [] [ text ("VR: " ++ String.fromInt player.victoryRequirement.points) ]
                 , li [] [ text ("VP: " ++ String.fromInt player.victoryPoints.points) ]
                 , li [] [ text ("🐄: " ++ String.fromInt player.cattle) ]
                 ]
             ]
         ]
+
+
+showSpecialist : ( Specialist, Int ) -> String
+showSpecialist ( specialist, n ) =
+    let
+        specialistName =
+            case specialist of
+                Shaman ->
+                    "Shaman"
+
+                RainCeremony ->
+                    "Rain Ceremony"
+
+                Herd ->
+                    "Herd"
+
+                Builder ->
+                    "Builder"
+
+                Nomads ->
+                    "Nomads"
+    in
+    specialistName ++ " (" ++ String.fromInt n ++ ")"
 
 
 renderControlPanel : Model -> Html Msg
