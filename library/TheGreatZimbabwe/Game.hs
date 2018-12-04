@@ -11,7 +11,6 @@ import           Prelude                hiding (round)
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
---import           TheGreatZimbabwe.Validation
 
 getPlayer :: PlayerId -> Game -> Either GameError Player
 getPlayer playerId game = case M.lookup playerId (game ^. players) of

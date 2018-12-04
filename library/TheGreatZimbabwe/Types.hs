@@ -102,7 +102,13 @@ data EmpirePlaque = PlayerPlaque Empire | ShadipinyiPlaque
 deriveBoth defaultOptions ''EmpirePlaque
 
 data Resource = Clay | Wood | Ivory | Diamonds
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
+
+instance FromJSONKey Resource where
+  fromJSONKey = FromJSONKeyValue parseJSON
+
+instance ToJSONKey Resource where
+  toJSONKey = ToJSONKeyValue toJSON toEncoding
 
 deriveBoth defaultOptions ''Resource
 
@@ -496,6 +502,10 @@ data Game = Game
   -- ^ PlayerId of the winner of the game, if any.
   , gameStep :: Natural
   -- ^ Current step of the game (cycles whenever current player cycles)
+  , gameResourceTiles :: M.Map Resource Int
+  -- ^ Remaining resource tiles in the game
+  , gameWaterTiles :: Int
+  -- ^ Remaining water tiles
   } deriving (Generic, Show)
 
 instance Semigroup Game where
@@ -508,10 +518,12 @@ instance Semigroup Game where
     , gameSpecialists = on (<>) gameSpecialists g1 g2
     , gameWinner = on (<|>) gameWinner g1 g2
     , gameStep = on (+) gameStep g1 g2
+    , gameResourceTiles = on (M.unionWith (+)) gameResourceTiles g1 g2
+    , gameWaterTiles = on (+) gameWaterTiles g1 g2
     }
 
 instance Monoid Game where
-  mempty = Game mempty mempty mempty mempty mempty mempty Nothing 0
+  mempty = Game mempty mempty mempty mempty mempty mempty Nothing 0 mempty 0
 
 deriveBoth (unPrefix "game") ''Game
 makeLensesWith camelCaseFields ''Game

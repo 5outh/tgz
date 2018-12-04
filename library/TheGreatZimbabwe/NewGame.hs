@@ -56,6 +56,10 @@ newGame playerList = GameEvent <$> do
           gameWinner      = Nothing
           gameMapLayout   = layout
           gameStep        = 0
+          -- TODO: These need to be validated from the box.
+          gameWaterTiles  = 6
+          gameResourceTiles =
+            M.fromList [(Clay, 4), (Wood, 4), (Ivory, 4), (Diamonds, 4)]
       pure $ Right Game {..}
 
 newGameCraftsmen :: M.Map Craftsman [TechnologyCard]

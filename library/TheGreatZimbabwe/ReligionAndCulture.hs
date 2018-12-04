@@ -85,13 +85,24 @@ useShaman resource location playerId game =
         playerHasCattle 2 playerId game
         playerHasSpecialist Shaman playerId game
 
+        case (M.lookup resource (game ^. resourceTiles)) of
+          Nothing ->
+            invalidAction "There are no resource tiles of that type left."
+          Just n ->
+            (n <= 0)
+              `impliesInvalid` "There are no resource tiles of that type left."
+
         pure $ game <> updates
  where
   updateLayout :: Game
   updateLayout = mempty & mapLayout .~ MapLayout
     (M.singleton location (Land (Resource resource)))
 
-  updates = mconcat [updateLayout, paySpecialist Shaman 2 playerId]
+  adjustResources :: Game
+  adjustResources = mempty & resourceTiles .~ M.singleton resource (-1)
+
+  updates =
+    mconcat [updateLayout, paySpecialist Shaman 2 playerId, adjustResources]
 
 paySpecialist :: Specialist -> Int -> PlayerId -> Game
 paySpecialist specialist n playerId =
@@ -100,6 +111,7 @@ paySpecialist specialist n playerId =
       , setPlayer playerId (mempty & cattle -~ n)
       ]
 
+-- TODO: Rain tiles are limited.
 useRainCeremony
   :: Location
   -> Location
@@ -110,6 +122,10 @@ useRainCeremony loc1 loc2 playerId game = PlayerAction $ do
   playerIs playerId game
   phaseIs ReligionAndCulture game
   playerHasSpecialist RainCeremony playerId game
+  playerHasCattle 3 playerId game
+  (game ^. waterTiles <= 0)
+    `impliesInvalid` "There are no water tiles remaining."
+
 
   let convertLocationToWater :: Location -> Game
       convertLocationToWater loc =
@@ -131,7 +147,12 @@ useRainCeremony loc1 loc2 playerId game = PlayerAction $ do
                                 (pure $ convertLocationToWater loc2)
 
   pure $ mconcat
-    [game, convertLoc1, convertLoc2, paySpecialist RainCeremony 2 playerId]
+    [ game
+    , convertLoc1
+    , convertLoc2
+    , paySpecialist RainCeremony 2 playerId
+    , mempty & waterTiles .~ (-1)
+    ]
 
   -- Locations must be adjacent and both empty
 
@@ -156,10 +177,28 @@ useHerd n playerId game = PlayerAction $ do
   where herd1 = mconcat [paySpecialist Herd 2 playerId, addCattle 1 playerId]
 
 useBuilder :: PlayerId -> Game -> PlayerAction 'ReligionAndCulture
-useBuilder = undefined
+useBuilder playerId game = PlayerAction $ do
+  playerIs playerId game
+  phaseIs ReligionAndCulture game
+  playerHasCattle 2 playerId game
+  playerHasSpecialist Builder playerId game
+
+  pure $ mconcat
+    [ game
+    , setPlayer playerId (mempty & activations .~ S.singleton BuilderActive)
+    ]
 
 useNomads :: PlayerId -> Game -> PlayerAction 'ReligionAndCulture
-useNomads = undefined
+useNomads playerId game = PlayerAction $ do
+  playerIs playerId game
+  phaseIs ReligionAndCulture game
+  playerHasCattle 2 playerId game
+  playerHasSpecialist Nomads playerId game
+
+  pure $ mconcat
+    [ game
+    , setPlayer playerId (mempty & activations .~ S.singleton NomadsActive)
+    ]
 
 executeIfEmpty
   :: Text
@@ -302,11 +341,11 @@ lookupCraftsman location game = asum
         guard (rotatedDimensions craftsman == dimension)
         pure (player, craftsman)
 
-
+-- TODO: This triggers a player taking a technology card if possible
 -- TODO: Craftsmen have shapes, which must be validated. Location is top-left
 -- of Craftsman tile
 placeCraftsmen
-  :: [(Location, Craftsman)]
+  :: [(Location, Rotated Craftsman)]
   -- ^ Note: This can be empty just to trigger a 'raisePrices' command.
   -> PlayerId
   -> Game
