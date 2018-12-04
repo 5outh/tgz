@@ -5,10 +5,15 @@ import           Prelude                hiding (round)
 
 import           Control.Lens
 import           Control.Monad          (when)
+import qualified Data.Map.Strict        as M
+import           Data.Maybe
 import qualified Data.Text              as T
+import           GHC.Natural
 import           TheGreatZimbabwe.Error
+import           TheGreatZimbabwe.Game
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
+
 
 phaseIs :: Phase -> Game -> Either GameError ()
 phaseIs phase game =
@@ -26,8 +31,19 @@ playerIs playerId game =
   (Just playerId /= current) `impliesInvalid` "It's not your turn."
   where current = game ^. round . currentPlayer
 
-impliesInvalid :: Bool -> T.Text -> Either GameError ()
-predicate `impliesInvalid` err = when predicate $ invalidAction err
+playerHasCattle :: Natural -> PlayerId -> Game -> Either GameError ()
+playerHasCattle amount playerId game = do
+  player <- getPlayer playerId game
+  (player ^. cattle < fromIntegral amount) `impliesInvalid` notEnoughCattle
+ where
+  notEnoughCattle =
+    "You do not have enough cattle (need " <> tshow amount <> ")."
 
-impliesError :: Bool -> T.Text -> Either GameError ()
-predicate `impliesError` err = when predicate $ internalError err
+playerHasSpecialist :: Specialist -> PlayerId -> Game -> Either GameError ()
+playerHasSpecialist specialist playerId game = do
+  player <- getPlayer playerId game
+  (isNothing $ M.lookup specialist (player ^. specialists))
+    `impliesInvalid` doesn'tHaveSpecialist
+ where
+  doesn'tHaveSpecialist =
+    "You don't have that Specialist (" <> tshow specialist <> ")."

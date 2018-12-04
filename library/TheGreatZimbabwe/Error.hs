@@ -2,7 +2,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 module TheGreatZimbabwe.Error where
 
-import qualified Data.Text    as T
+import           Control.Monad
+import qualified Data.Text     as T
 import           Elm.Derive
 import           GHC.Generics
 
@@ -19,3 +20,8 @@ invalidAction = Left . InvalidAction
 internalError :: T.Text -> Either GameError a
 internalError = Left . InternalError
 
+impliesInvalid :: Bool -> T.Text -> Either GameError ()
+predicate `impliesInvalid` err = when predicate $ invalidAction err
+
+impliesError :: Bool -> T.Text -> Either GameError ()
+predicate `impliesError` err = when predicate $ internalError err

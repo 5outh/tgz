@@ -76,11 +76,29 @@ useShaman
   -> PlayerId
   -> Game
   -> PlayerAction 'ReligionAndCulture
-useShaman resource location playerId game = undefined
+useShaman resource location playerId game =
+  PlayerAction
+    $ executeIfEmpty "Cannot build resource" location playerId game
+    $ do
+        playerIs playerId game
+        phaseIs ReligionAndCulture game
+        playerHasCattle 2 playerId game
+        playerHasSpecialist Shaman playerId game
+
+        pure $ game <> updates
  where
   updateLayout :: Game
   updateLayout = mempty & mapLayout .~ MapLayout
     (M.singleton location (Land (Resource resource)))
+
+  updates = mconcat [updateLayout, paySpecialist Shaman 2 playerId]
+
+paySpecialist :: Specialist -> Int -> PlayerId -> Game
+paySpecialist specialist n playerId =
+  mconcat
+    $ [ setPlayer playerId (mempty & specialists .~ M.singleton specialist n)
+      , setPlayer playerId (mempty & cattle -~ n)
+      ]
 
 useRainCeremony
   :: Location
@@ -88,10 +106,54 @@ useRainCeremony
   -> PlayerId
   -> Game
   -> PlayerAction 'ReligionAndCulture
-useRainCeremony = undefined
+useRainCeremony loc1 loc2 playerId game = PlayerAction $ do
+  playerIs playerId game
+  phaseIs ReligionAndCulture game
+  playerHasSpecialist RainCeremony playerId game
 
+  let convertLocationToWater :: Location -> Game
+      convertLocationToWater loc =
+        mempty & mapLayout .~ MapLayout (M.singleton loc Water)
+
+  not (locationsAreAdjacent loc2 loc2)
+    `impliesInvalid` "Water must be placed in adjacent locations when using rain ceremony."
+
+  convertLoc1 <- executeIfEmpty "Cannot convert to water"
+                                loc1
+                                playerId
+                                game
+                                (pure $ convertLocationToWater loc1)
+
+  convertLoc2 <- executeIfEmpty "Cannot convert to water"
+                                loc2
+                                playerId
+                                game
+                                (pure $ convertLocationToWater loc2)
+
+  pure $ mconcat
+    [game, convertLoc1, convertLoc2, paySpecialist RainCeremony 2 playerId]
+
+  -- Locations must be adjacent and both empty
+
+locationsAreAdjacent :: Location -> Location -> Bool
+locationsAreAdjacent (Location x y) loc2 = loc2 `elem` possibilities
+ where
+  possibilities =
+    [ Location (pred x) y
+    , Location (succ x) y
+    , Location x        (pred y)
+    , Location x        (succ y)
+    ]
+
+-- use herd N times (2 cattle on card, gain 1 per n)
 useHerd :: Natural -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
-useHerd = undefined
+useHerd n playerId game = PlayerAction $ do
+  playerIs playerId game
+  phaseIs ReligionAndCulture game
+  playerHasCattle (n * 2) playerId game
+
+  pure $ game <> mconcat (replicate (fromIntegral n) herd1)
+  where herd1 = mconcat [paySpecialist Herd 2 playerId, addCattle 1 playerId]
 
 useBuilder :: PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 useBuilder = undefined
@@ -100,16 +162,13 @@ useNomads :: PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 useNomads = undefined
 
 executeIfEmpty
-  :: (Either GameError Game)
-  -> Text
+  :: Text
   -> Location
   -> PlayerId
   -> Game
   -> Either GameError Game
-executeIfEmpty executeAction message location playerId game = do
-  playerIs playerId game
-  phaseIs ReligionAndCulture game
-
+  -> Either GameError Game
+executeIfEmpty message location playerId game executeAction = do
   let mLocated = locatedAt location game
   let invalidMessage msg =
         invalidAction $ message <> " " <> pprintLocation location <> ": " <> msg
@@ -157,7 +216,7 @@ buildMonument location playerId game = PlayerAction $ do
                        (mempty { playerMonuments = M.singleton location 1 })
           <> addVictoryPoints 1 playerId game
   let message = "Can't build a new monument"
-  executeIfEmpty executeAction message location playerId game
+  executeIfEmpty message location playerId game executeAction
 
 data Located
   = LocatedSquare Square

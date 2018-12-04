@@ -368,7 +368,7 @@ instance Semigroup Player where
     , playerMonuments = on (M.unionWith (+)) playerMonuments p1 p2
     , playerCraftsmen = on (<>) playerCraftsmen p1 p2
     , playerTechnologyCards = on (M.unionWith (+)) playerTechnologyCards p1 p2
-    , playerSpecialists = on (<>) playerSpecialists p1 p2
+    , playerSpecialists = on (M.unionWith (+)) playerSpecialists p1 p2
     , playerGod = on (<|>) playerGod p1 p2
     , playerActivations = playerActivations p2
     }

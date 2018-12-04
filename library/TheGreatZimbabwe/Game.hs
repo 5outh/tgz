@@ -2,16 +2,16 @@
 module TheGreatZimbabwe.Game where
 
 import           Control.Lens
-import           Data.List                   (elemIndex)
-import qualified Data.Map.Strict             as M
-import qualified Data.Set                    as S
+import           Data.List              (elemIndex)
+import qualified Data.Map.Strict        as M
+import qualified Data.Set               as S
 import           Elm.Derive
 import           GHC.Natural
-import           Prelude                     hiding (round)
+import           Prelude                hiding (round)
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
-import           TheGreatZimbabwe.Validation
+--import           TheGreatZimbabwe.Validation
 
 getPlayer :: PlayerId -> Game -> Either GameError Player
 getPlayer playerId game = case M.lookup playerId (game ^. players) of
@@ -89,6 +89,12 @@ addVictoryPoints pointsToAdd playerId game = setPlayer playerId stepPlayer
     { pointsStep   = game ^. step
     , pointsPoints = pointsToAdd
     }
+
+addCattle :: Int -> PlayerId -> Game
+addCattle n playerId = setPlayer playerId (mempty & cattle .~ n)
+
+subtractCattle :: Int -> PlayerId -> Game
+subtractCattle n playerId = setPlayer playerId (mempty & cattle .~ (-n))
 
 newRound :: Game -> Either GameError Game
 newRound _ = internalError "cannot start a new round yet"
