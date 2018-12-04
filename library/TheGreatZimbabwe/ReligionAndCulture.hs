@@ -11,6 +11,8 @@ import           Data.Foldable
 import qualified Data.Map.Strict             as M
 import           Data.Maybe
 import qualified Data.Set                    as S
+import           Data.Text                   (Text)
+import           Debug.Trace
 import           Elm.Derive
 import           GHC.Natural
 import           TheGreatZimbabwe.Error
@@ -41,7 +43,10 @@ chooseGod god playerId game = PlayerAction $ do
   -- NB. destructive
   let withoutGod = game & gods %~ S.delete god
 
-  pure $ withoutGod <> setPlayer playerId (mempty { playerGod = Just god })
+  pure
+    $  withoutGod
+    <> setPlayer playerId (mempty { playerGod = Just god })
+    <> addVictoryRequirement (godVR god) playerId mempty
 
 chooseSpecialist
   :: Specialist -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
@@ -56,26 +61,24 @@ chooseSpecialist specialist playerId game = PlayerAction $ do
   -- NB. destructive
   let withoutSpecialist = game & specialists %~ S.delete specialist
 
-  pure $ withoutSpecialist <> setPlayer
-    playerId
-    (mempty { playerSpecialists = S.singleton specialist })
+  pure
+    $  withoutSpecialist
+    <> setPlayer playerId
+                 (mempty { playerSpecialists = S.singleton specialist })
+    <> addVictoryRequirement (fromIntegral $ specialistVR specialist)
+                             playerId
+                             mempty
 
--- TODO: This is complicated
-useSpecialist
-  :: Specialist -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
-useSpecialist specialist = case specialist of
-  Shaman       -> useShaman
-  RainCeremony -> useRainCeremony
-  -- N.B. This number has two uses: to track the number of cattle on the card
-  -- total, and the number a player is placing on the card during this action (max 2).
-  Herd    n    -> useHerd n
-  Builder _    -> useBuilder
-  Nomads       -> useNomads
-
+-- TODO: Resource tiles are limited.
 useShaman :: PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 useShaman = undefined
 
-useRainCeremony :: PlayerId -> Game -> PlayerAction 'ReligionAndCulture
+useRainCeremony
+  :: Location
+  -> Location
+  -> PlayerId
+  -> Game
+  -> PlayerAction 'ReligionAndCulture
 useRainCeremony = undefined
 
 useHerd :: Natural -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
@@ -87,26 +90,20 @@ useBuilder = undefined
 useNomads :: PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 useNomads = undefined
 
-buildMonument
-  :: Location -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
-buildMonument location playerId game = PlayerAction $ do
+executeIfEmpty
+  :: (Either GameError Game)
+  -> Text
+  -> Location
+  -> PlayerId
+  -> Game
+  -> Either GameError Game
+executeIfEmpty executeAction message location playerId game = do
   playerIs playerId game
   phaseIs ReligionAndCulture game
 
-  let executeAction =
-        pure
-          $  game
-          <> setPlayer playerId
-                       (mempty { playerMonuments = M.singleton location 1 })
-          <> addVictoryPoints 1 playerId game
-
   let mLocated = locatedAt location game
   let invalidMessage msg =
-        invalidAction
-          $  "Can't build a monument at "
-          <> pprintLocation location
-          <> ": "
-          <> msg
+        invalidAction $ message <> " " <> pprintLocation location <> ": " <> msg
 
   -- woo! what a world
   case mLocated of
@@ -140,6 +137,18 @@ buildMonument location playerId game = PlayerAction $ do
                     $ showPlayerUsername player
                     <> " has already built a monument too close to this location!"
                 Nothing -> executeAction
+
+buildMonument
+  :: Location -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
+buildMonument location playerId game = PlayerAction $ do
+  let executeAction =
+        pure
+          $  game
+          <> setPlayer playerId
+                       (mempty { playerMonuments = M.singleton location 1 })
+          <> addVictoryPoints 1 playerId game
+  let message = "Can't build a new monument"
+  executeIfEmpty executeAction message location playerId game
 
 data Located
   = LocatedSquare Square

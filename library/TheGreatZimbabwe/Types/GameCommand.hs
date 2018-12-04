@@ -15,7 +15,14 @@ data ReligionAndCultureCommand1 = ChooseGod God | ChooseSpecialist Specialist
 
 deriveBoth defaultOptions ''ReligionAndCultureCommand1
 
-data UseSpecialist = UseSpecialist Specialist
+data UseSpecialist
+  = UseShaman
+  | UseRainCeremony Location Location
+  -- ^ Place 2 contiguous water tiles.
+  | UseHerd Natural
+  -- ^ Use a herd n times
+  | UseBuilder
+  | UseNomads
   deriving (Show)
 
 deriveBoth defaultOptions ''UseSpecialist

@@ -622,16 +622,33 @@ jsonEncReligionAndCultureCommand1  val =
 
 
 type UseSpecialist  =
-    UseSpecialist Specialist
+    UseShaman 
+    | UseRainCeremony Location Location
+    | UseHerd Int
+    | UseBuilder 
+    | UseNomads 
 
+-- TODO: port this over
 jsonDecUseSpecialist : Json.Decode.Decoder ( UseSpecialist )
 jsonDecUseSpecialist =
-    Json.Decode.lazy (\_ -> Json.Decode.map UseSpecialist (jsonDecSpecialist))
-
+    let jsonDecDictUseSpecialist = Dict.fromList
+            [ ("UseShaman", Json.Decode.lazy (\_ -> Json.Decode.succeed UseShaman))
+            , ("UseRainCeremony", Json.Decode.lazy (\_ -> Json.Decode.map2 UseRainCeremony (Json.Decode.index 0 (jsonDecLocation)) (Json.Decode.index 1 (jsonDecLocation))))
+            , ("UseHerd", Json.Decode.lazy (\_ -> Json.Decode.map UseHerd (Json.Decode.int)))
+            , ("UseBuilder", Json.Decode.lazy (\_ -> Json.Decode.succeed UseBuilder))
+            , ("UseNomads", Json.Decode.lazy (\_ -> Json.Decode.succeed UseNomads))
+            ]
+    in  decodeSumObjectWithSingleField  "UseSpecialist" jsonDecDictUseSpecialist
 
 jsonEncUseSpecialist : UseSpecialist -> Value
-jsonEncUseSpecialist (UseSpecialist v1) =
-    jsonEncSpecialist v1
+jsonEncUseSpecialist  val =
+    let keyval v = case v of
+                    UseShaman  -> ("UseShaman", encodeValue (Json.Encode.list identity []))
+                    UseRainCeremony v1 v2 -> ("UseRainCeremony", encodeValue (Json.Encode.list identity [jsonEncLocation v1, jsonEncLocation v2]))
+                    UseHerd v1 -> ("UseHerd", encodeValue (Json.Encode.int v1))
+                    UseBuilder  -> ("UseBuilder", encodeValue (Json.Encode.list identity []))
+                    UseNomads  -> ("UseNomads", encodeValue (Json.Encode.list identity []))
+    in encodeSumObjectWithSingleField keyval val
 
 
 

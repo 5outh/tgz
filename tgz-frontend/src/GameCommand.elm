@@ -1,21 +1,42 @@
 module GameCommand exposing
     ( GameCommand(..)
+    , RaiseMonumentCommand(..)
+    , ReligionAndCultureCommand1(..)
+    , ReligionAndCultureCommand3(..)
+    , ReligionAndCultureMultiCommand
+    , UseSpecialist(..)
     , encodeGameCommand
+    , encodeRaiseMonumentCommand
+    , encodeReligionAndCultureCommand1
+    , encodeReligionAndCultureCommand3
+    , encodeReligionAndCultureMultiCommand
+    , encodeUseSpecialist
+    , parseBid
     , parseChooseEmpire
     , parseEmpire
+    , parseEnd
     , parseGameCommand
+    , parseGod
     , parseLocation
+    , parseLocations
+    , parsePass
     , parsePlaceStartingMonument
+    , parseReligionAndCultureCommand
+    , parseReligionAndCultureCommand1
+    , parseReligionAndCultureCommand3
+    , parseReligionAndCultureMultiCommand
+    , parseSpecialist
+    , parseUseSpecialist
     )
 
 import ApiTypes
     exposing
         ( Craftsman
         , Empire(..)
-        , God
+        , God(..)
         , Location
-        , Rotated
-        , Specialist
+        , Rotated(..)
+        , Specialist(..)
         , encodeCraftsman
         , encodeEmpire
         , encodeGod
@@ -84,6 +105,7 @@ parseGameCommand =
         , parsePlaceStartingMonument
         , parseBid
         , parsePass
+        , parseReligionAndCultureCommand
         ]
 
 
@@ -152,6 +174,123 @@ parsePass =
         |. spaces
         |. keyword "pass"
         |. chompUntilEndOr "\n"
+
+
+parseReligionAndCultureCommand : Parser GameCommand
+parseReligionAndCultureCommand =
+    succeed ReligionAndCultureCommand |= parseReligionAndCultureMultiCommand
+
+
+parseReligionAndCultureMultiCommand : Parser ReligionAndCultureMultiCommand
+parseReligionAndCultureMultiCommand =
+    succeed ReligionAndCultureMultiCommand
+        |= parseReligionAndCultureCommand1
+        |= parseUseSpecialist
+        |= parseReligionAndCultureCommand3
+        |= parseEnd
+
+
+parseReligionAndCultureCommand1 : Parser (Maybe ReligionAndCultureCommand1)
+parseReligionAndCultureCommand1 =
+    oneOf
+        [ succeed (Just << ChooseGod)
+            |. keyword "choose-god"
+            |. spaces
+            |= parseGod
+            |. chompUntilEndOr "\n"
+            |. spaces
+        , succeed (Just << ChooseSpecialist)
+            |. keyword "choose-specialist"
+            |. spaces
+            |= parseSpecialist
+            |. chompUntilEndOr "\n"
+            |. spaces
+        , succeed Nothing |. spaces
+        ]
+
+
+parseUseSpecialist : Parser (Maybe UseSpecialist)
+parseUseSpecialist =
+    oneOf
+        [ succeed (Just << UseSpecialist)
+            |. keyword "use-specialist"
+            |. spaces
+            |= parseSpecialist
+            |. chompUntilEndOr "\n"
+            |. spaces
+        , succeed Nothing |. spaces
+        ]
+
+
+parseSpecialist : Parser Specialist
+parseSpecialist =
+    oneOf
+        [ succeed Shaman |. keyword "shaman"
+        , succeed RainCeremony |. keyword "rain-ceremony"
+        , succeed (Herd 0) |. keyword "herd"
+        , succeed (Builder 0) |. keyword "builder"
+        , succeed Nomads |. keyword "nomads"
+        ]
+
+
+parseGod : Parser God
+parseGod =
+    oneOf
+        [ succeed Shadipinyi |. keyword "shadipinyi"
+        , succeed Elegua |. keyword "elegua"
+        , succeed Dziva |. keyword "dziva"
+        , succeed Eshu |. keyword "eshu"
+        , succeed Gu |. keyword "gu"
+        , succeed Obatala |. keyword "obatala"
+        , succeed Atete |. keyword "atete"
+        , succeed TsuiGoab |. keyword "tsui-goab"
+        , succeed Anansi |. keyword "anansi"
+        , succeed (Qamata 0) |. keyword "qamata"
+        , succeed Engai |. keyword "engai"
+        , succeed Xango |. keyword "xango"
+        ]
+
+
+parseReligionAndCultureCommand3 : Parser (Maybe ReligionAndCultureCommand3)
+parseReligionAndCultureCommand3 =
+    oneOf
+        [ succeed (Just << BuildMonuments)
+            |. keyword "build-monuments"
+            |. spaces
+            |= parseLocations
+            |. chompUntilEndOr "\n"
+            |. spaces
+        , succeed (Just << BuildMonuments << List.singleton)
+            |. keyword "build-monument"
+            |. spaces
+            |= parseLocation
+            |. chompUntilEndOr "\n"
+            |. spaces
+
+        -- , -- PlaceCraftsmen (List ( Location, Rotated Craftsman ))
+        -- , -- RaiseMonuments (List ( Location, List RaiseMonumentCommand ))
+        , succeed Nothing |. spaces
+        ]
+
+
+parseLocations : Parser (List Location)
+parseLocations =
+    Parser.sequence
+        { start = "["
+        , separator = ","
+        , end = "]"
+        , spaces = spaces
+        , item = parseLocation
+        , trailing = Parser.Forbidden
+        }
+
+
+parseEnd : Parser Bool
+parseEnd =
+    oneOf
+        [ succeed True |. spaces |. keyword "end" |. chompUntilEndOr "\n"
+        , succeed False
+        ]
 
 
 

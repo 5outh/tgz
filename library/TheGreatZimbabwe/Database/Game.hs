@@ -28,6 +28,10 @@ import           TheGreatZimbabwe.Aeson
 import           TheGreatZimbabwe.Database.JSONB
 import qualified TheGreatZimbabwe.Types          as Types
 
+-- TODO: If we just store an initial seed, we aren't at all beholden to
+-- the database representation of the game *at all*. The game command structure
+-- still matters, but the game structure can be modified willy-nilly. Might be
+-- worth that switch!
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
   Game sql=games
     name         Text

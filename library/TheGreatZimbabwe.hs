@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE PolyKinds           #-}
 {-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# OPTIONS_GHC -fno-warn-unused-local-binds    #-}
@@ -11,12 +12,14 @@ module TheGreatZimbabwe where
 
 import           Prelude                             hiding (round)
 
+import           Control.Applicative
 import           Control.Lens
 import           Data.List
-import           Data.List.NonEmpty                  (NonEmpty)
+import           Data.List.NonEmpty                  (NonEmpty (..))
 import qualified Data.Map.Strict                     as M
 import           Data.Maybe
 import qualified Data.Set                            as S
+import           Data.Traversable
 import           Debug.Trace
 import           Numeric.Natural
 import           TheGreatZimbabwe.Error
@@ -39,6 +42,27 @@ runGameCommand game playerId = \case
     handleFinishSetup (placeStartingMonument location playerId game)
   Bid amount -> handleFinishGenerosityOfKings (bid amount playerId game)
   Pass       -> handleFinishGenerosityOfKings (pass playerId game)
+  ReligionAndCultureCommand ReligionAndCultureMultiCommand {..} -> do
+    game0 <-
+      fmap (fromMaybe game) $ for religionAndCultureMultiCommandAction1 $ \case
+        ChooseGod god -> getPlayerAction $ chooseGod god playerId game
+        ChooseSpecialist specialist ->
+          getPlayerAction $ chooseSpecialist specialist playerId game
+    game1 <-
+      fmap (fromMaybe game0) $ for religionAndCultureMultiCommandAction2 $ \case
+        UseShaman -> getPlayerAction $ useShaman playerId game0
+        UseRainCeremony l1 l2 ->
+          getPlayerAction $ useRainCeremony l1 l2 playerId game0
+        UseHerd n  -> getPlayerAction $ useHerd n playerId game0
+        UseBuilder -> getPlayerAction $ useBuilder playerId game0
+        UseNomads  -> getPlayerAction $ useNomads playerId game0
+    game2 <-
+      fmap (fromMaybe game1) $ for religionAndCultureMultiCommandAction3 $ \case
+        BuildMonuments (location :| []) ->
+          getPlayerAction $ buildMonument location playerId game
+        BuildMonuments (location :| (x : _)) -> error "unimplemented"
+        _ -> error "unimplemented"
+    if religionAndCultureMultiCommandEnd then cyclePlayers game2 else pure game2
 
 runGameCommands :: Game -> [(PlayerId, GameCommand)] -> Either GameError Game
 runGameCommands game commands = foldl' go (Right game) commands

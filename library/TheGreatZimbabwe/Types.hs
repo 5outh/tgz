@@ -311,7 +311,7 @@ godVR = \case
   Xango      -> (-2)
 
 data Points = Points
-  { pointsPoints :: Natural
+  { pointsPoints :: Int
   , pointsStep :: Natural
   } deriving (Show, Eq, Ord)
 

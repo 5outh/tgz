@@ -74,7 +74,7 @@ setPlayer :: PlayerId -> Player -> Game
 setPlayer playerId player =
   mempty { gamePlayers = M.singleton playerId player }
 
-addVictoryRequirement :: Natural -> PlayerId -> Game -> Game
+addVictoryRequirement :: Int -> PlayerId -> Game -> Game
 addVictoryRequirement pointsToAdd playerId game = setPlayer playerId stepPlayer
  where
   stepPlayer = mempty & victoryRequirement .~ Points
@@ -82,10 +82,10 @@ addVictoryRequirement pointsToAdd playerId game = setPlayer playerId stepPlayer
     , pointsPoints = pointsToAdd
     }
 
-addVictoryPoints :: Natural -> PlayerId -> Game -> Game
+addVictoryPoints :: Int -> PlayerId -> Game -> Game
 addVictoryPoints pointsToAdd playerId game = setPlayer playerId stepPlayer
  where
-  stepPlayer = mempty & victoryRequirement .~ Points
+  stepPlayer = mempty & victoryPoints .~ Points
     { pointsStep   = game ^. step
     , pointsPoints = pointsToAdd
     }

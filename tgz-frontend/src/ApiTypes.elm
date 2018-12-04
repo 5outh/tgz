@@ -671,16 +671,9 @@ type
 
 type Specialist
     = Shaman
-      -- ^ May place one resource for 2 cattle (additional action type)
     | RainCeremony
-      -- ^ May place one water tile for 3 cattle
     | Herd Int
-      -- ^ May pay 2 cattle to this card to gain 1 cattle from the common stock.
-      -- Use at most 3 times per turn.
     | Builder Int
-      -- ^ Pay 2 cattle to activate this turn.
-      -- If active, you pay the first two cattle of each newly placed craftsman to
-      -- this card.
     | Nomads
 
 
@@ -751,17 +744,53 @@ encodeReligionAndCultureCommand1 val =
 
 
 type UseSpecialist
-    = UseSpecialist Specialist
+    = UseShaman
+    | UseRainCeremony Location Location
+    | UseHerd Int
+    | UseBuilder
+    | UseNomads
+
+
+
+-- TODO: port this over
 
 
 decodeUseSpecialist : Decode.Decoder UseSpecialist
 decodeUseSpecialist =
-    Decode.lazy (\_ -> Decode.map UseSpecialist decodeSpecialist)
+    let
+        decodeDictUseSpecialist =
+            Dict.fromList
+                [ ( "UseShaman", Decode.lazy (\_ -> Decode.succeed UseShaman) )
+                , ( "UseRainCeremony", Decode.lazy (\_ -> Decode.map2 UseRainCeremony (Decode.index 0 decodeLocation) (Decode.index 1 decodeLocation)) )
+                , ( "UseHerd", Decode.lazy (\_ -> Decode.map UseHerd Decode.int) )
+                , ( "UseBuilder", Decode.lazy (\_ -> Decode.succeed UseBuilder) )
+                , ( "UseNomads", Decode.lazy (\_ -> Decode.succeed UseNomads) )
+                ]
+    in
+    decodeSumObjectWithSingleField "UseSpecialist" decodeDictUseSpecialist
 
 
 encodeUseSpecialist : UseSpecialist -> Value
-encodeUseSpecialist (UseSpecialist v1) =
-    encodeSpecialist v1
+encodeUseSpecialist val =
+    let
+        keyval v =
+            case v of
+                UseShaman ->
+                    ( "UseShaman", encodeValue (Encode.list identity []) )
+
+                UseRainCeremony v1 v2 ->
+                    ( "UseRainCeremony", encodeValue (Encode.list identity [ encodeLocation v1, encodeLocation v2 ]) )
+
+                UseHerd v1 ->
+                    ( "UseHerd", encodeValue (Encode.int v1) )
+
+                UseBuilder ->
+                    ( "UseBuilder", encodeValue (Encode.list identity []) )
+
+                UseNomads ->
+                    ( "UseNomads", encodeValue (Encode.list identity []) )
+    in
+    encodeSumObjectWithSingleField keyval val
 
 
 type ReligionAndCultureCommand3

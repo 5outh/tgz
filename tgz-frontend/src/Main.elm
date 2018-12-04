@@ -14,11 +14,11 @@ import ApiTypes as ApiTypes
     exposing
         ( Empire(..)
         , EmpirePlaque(..)
-        , Phase(..)
         , GameView
         , GenerosityOfKingsState
         , Location
         , MapLayout
+        , Phase(..)
         , Player
         , decodeGameView
         , encodeEmpire
@@ -34,7 +34,25 @@ import Dict
 import Extra.Maybe exposing (..)
 import GameCommand exposing (GameCommand(..), encodeGameCommand, parseGameCommand)
 import GameError exposing (GameError(..), decodeGameErrorFromBadStatusResponse)
-import Html exposing (Attribute, Html, button, canvas, div, h1, h2, h3, img, input, li, p, span, text, ul)
+import Html
+    exposing
+        ( Attribute
+        , Html
+        , button
+        , canvas
+        , div
+        , h1
+        , h2
+        , h3
+        , img
+        , input
+        , li
+        , p
+        , span
+        , text
+        , textarea
+        , ul
+        )
 import Html.Attributes exposing (height, id, placeholder, src, style, value, width)
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Html.Keyed exposing (node)
@@ -341,9 +359,11 @@ renderGame game =
             [ h1 [] [ text game.name ]
             ]
         , gameCanvas
-        , if game.state.round.currentPhase == Just GenerosityOfKings
-          then renderGenerosityOfKingsState game
-          else div [] []
+        , if game.state.round.currentPhase == Just GenerosityOfKings then
+            renderGenerosityOfKingsState game
+
+          else
+            div [] []
         , div [] [ listPlayers currentPlayerUsername (trace <| Dict.values game.state.players) ]
 
         -- TODO: Only if Pre-Setup phase, and add choices
@@ -423,7 +443,7 @@ renderControlPanel model =
                     IssueGameCommand gameCommand
     in
     div []
-        [ input
+        [ textarea
             [ placeholder "Enter command"
             , value (first model.playerCommand)
             , onInput UpdateCommand
@@ -437,7 +457,8 @@ renderControlPanel model =
                 )
             ]
             []
-        , div [] [ text <| Debug.toString (second model.playerCommand) ]
+        , div [] [ button [ onClick (issueCommandIfPossible parsedCommand) ] [ text "Go!" ] ]
+        , div [] [ text <| Debug.toString parsedCommand ]
         ]
 
 
