@@ -123,6 +123,7 @@ deriveBoth defaultOptions ''Square
 
 newtype MapLayout = MapLayout { mapLayoutMapLayout :: M.Map Location Square }
   deriving stock (Show, Eq)
+  deriving newtype (Semigroup, Monoid)
 
 deriveBoth (unPrefix "mapLayout") ''MapLayout
 makeLensesWith camelCaseFields ''MapLayout
@@ -215,21 +216,28 @@ instance ToJSONKey TechnologyCard where
 deriveBoth (unPrefix "technologyCard") ''TechnologyCard
 makeLensesWith camelCaseFields ''TechnologyCard
 
+-- The 'Natural' is the number of cattle paid to the card
 data Specialist
   = Shaman
   -- ^ May place one resource for 2 cattle (additional action type)
   | RainCeremony
   -- ^ May place one water tile for 3 cattle
-  | Herd Natural
+  | Herd
   -- ^ May pay 2 cattle to this card to gain 1 cattle from the common stock.
   -- Use at most 3 times per turn.
-  | Builder Natural
+  | Builder
   -- ^ Pay 2 cattle to activate this turn.
   -- If active, you pay the first two cattle of each newly placed craftsman to
   -- this card.
   | Nomads
   -- ^ Pay 2 cattle to ignore zoning restrictions when building a new monument
     deriving (Eq, Ord, Generic, Show)
+
+instance FromJSONKey Specialist where
+  fromJSONKey = FromJSONKeyValue parseJSON
+
+instance ToJSONKey Specialist where
+  toJSONKey = ToJSONKeyValue toJSON toEncoding
 
 deriveBoth defaultOptions ''Specialist
 
@@ -238,11 +246,11 @@ specialistVR = \case
   Shaman       -> 3
   Nomads       -> 1
   RainCeremony -> 1
-  Builder _    -> 2
-  Herd    _    -> 6
+  Builder      -> 2
+  Herd         -> 6
 
 allSpecialists :: S.Set Specialist
-allSpecialists = S.fromList [Shaman, RainCeremony, Herd 0, Builder 0, Nomads]
+allSpecialists = S.fromList [Shaman, RainCeremony, Herd, Builder, Nomads]
 
 data Activation = BuilderActive | NomadsActive | None
   deriving (Show, Eq, Ord)
@@ -342,7 +350,7 @@ data Player = Player
   , playerTechnologyCards    :: M.Map TechnologyCard Int
   -- ^ Player-owned technology cards, along with the price other players must
   -- pay to use them
-  , playerSpecialists        :: S.Set Specialist
+  , playerSpecialists        :: M.Map Specialist Int
   -- ^ Player-owned specialist cards
   , playerGod                :: Maybe God
   -- ^ God a player adores
@@ -476,7 +484,7 @@ data Game = Game
   -- ^ Players of the game, in unordered format.
   , gameRound     :: Round
   -- ^ Current Round state
-  , gameMapLayout :: Maybe MapLayout
+  , gameMapLayout :: MapLayout
   -- ^ Layout of the Map
   , gameCraftsmen :: M.Map Craftsman [TechnologyCard]
   -- ^ Remaining Craftsmen of each type
@@ -494,7 +502,7 @@ instance Semigroup Game where
   g1 <> g2 = Game
     { gamePlayers = on (M.unionWith (<>)) gamePlayers g1 g2
     , gameRound = on (<>) gameRound g1 g2
-    , gameMapLayout = on appendLast gameMapLayout g1 g2
+    , gameMapLayout = on (<>) gameMapLayout g1 g2
     , gameCraftsmen = on (M.unionWith (<>)) gameCraftsmen g1 g2
     , gameGods = on (<>) gameGods g1 g2
     , gameSpecialists = on (<>) gameSpecialists g1 g2
@@ -503,7 +511,7 @@ instance Semigroup Game where
     }
 
 instance Monoid Game where
-  mempty = Game mempty mempty Nothing mempty mempty mempty Nothing 0
+  mempty = Game mempty mempty mempty mempty mempty mempty Nothing 0
 
 deriveBoth (unPrefix "game") ''Game
 makeLensesWith camelCaseFields ''Game

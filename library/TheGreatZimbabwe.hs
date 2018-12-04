@@ -50,7 +50,8 @@ runGameCommand game playerId = \case
           getPlayerAction $ chooseSpecialist specialist playerId game
     game1 <-
       fmap (fromMaybe game0) $ for religionAndCultureMultiCommandAction2 $ \case
-        UseShaman -> getPlayerAction $ useShaman playerId game0
+        UseShaman resource location ->
+          getPlayerAction $ useShaman resource location playerId game0
         UseRainCeremony l1 l2 ->
           getPlayerAction $ useRainCeremony l1 l2 playerId game0
         UseHerd n  -> getPlayerAction $ useHerd n playerId game0
@@ -72,8 +73,6 @@ runGameCommands game commands = foldl' go (Right game) commands
   go eGame (playerId, command) = case eGame of
     Left  err   -> Left err
     Right game' -> runGameCommand game' playerId command
-
--- * Common
 
 -- * Pre-Setup
 
@@ -128,10 +127,9 @@ placeStartingMonument location playerId game = PlayerAction $ do
     <> setPlayer playerId withStartingMonument
     <> addVictoryPoints 1 playerId game
  where
-  isStartingMonument = case (game ^. mapLayout) of
-    Nothing -> False
-    Just (MapLayout layout) ->
-      M.lookup location layout == Just (Land StartingArea)
+  isStartingMonument =
+    M.lookup location (mapLayoutMapLayout (game ^. mapLayout))
+      == Just (Land StartingArea)
   otherPlayers = filter ((/= playerId) . fst) $ M.toList (game ^. players)
   otherPlayerMonumentLocations =
     concatMap (M.keys . playerMonuments . snd) otherPlayers

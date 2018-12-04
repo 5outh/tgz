@@ -64,14 +64,23 @@ chooseSpecialist specialist playerId game = PlayerAction $ do
   pure
     $  withoutSpecialist
     <> setPlayer playerId
-                 (mempty { playerSpecialists = S.singleton specialist })
+                 (mempty { playerSpecialists = M.singleton specialist 0 })
     <> addVictoryRequirement (fromIntegral $ specialistVR specialist)
                              playerId
                              mempty
 
 -- TODO: Resource tiles are limited.
-useShaman :: PlayerId -> Game -> PlayerAction 'ReligionAndCulture
-useShaman = undefined
+useShaman
+  :: Resource
+  -> Location
+  -> PlayerId
+  -> Game
+  -> PlayerAction 'ReligionAndCulture
+useShaman resource location playerId game = undefined
+ where
+  updateLayout :: Game
+  updateLayout = mempty & mapLayout .~ MapLayout
+    (M.singleton location (Land (Resource resource)))
 
 useRainCeremony
   :: Location
@@ -173,7 +182,7 @@ playerMonumentAround location game = asum
 
 locatedAt :: Location -> Game -> Maybe Located
 locatedAt location game =
-  let layout = fromMaybe mempty $ mapLayoutMapLayout <$> (gameMapLayout game)
+  let layout     = mapLayoutMapLayout $ (gameMapLayout game)
       players'   = M.elems (game ^. players)
       mSquare    = M.lookup location layout
       mMonument  = lookupMonument location game

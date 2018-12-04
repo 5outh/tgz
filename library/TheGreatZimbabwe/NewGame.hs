@@ -54,7 +54,7 @@ newGame playerList = GameEvent <$> do
           gameSpecialists = allSpecialists
           gameCraftsmen   = newGameCraftsmen
           gameWinner      = Nothing
-          gameMapLayout   = Just layout
+          gameMapLayout   = layout
           gameStep        = 0
       pure $ Right Game {..}
 
