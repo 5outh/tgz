@@ -2,12 +2,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
 module TheGreatZimbabwe.ReligionAndCulture where
 
 import           Control.Applicative
 import           Control.Lens
 import           Control.Monad
 import           Data.Foldable
+import qualified Data.List                   as L
 import qualified Data.Map.Strict             as M
 import           Data.Maybe
 import qualified Data.Set                    as S
@@ -112,7 +114,6 @@ paySpecialist specialist n playerId =
       , setPlayer playerId (mempty & cattle -~ n)
       ]
 
--- TODO: Rain tiles are limited.
 useRainCeremony
   :: Location
   -> Location
@@ -129,29 +130,24 @@ useRainCeremony loc1 loc2 playerId game = PlayerAction $ do
     `impliesInvalid` "There are no water tiles remaining."
 
 
-  let convertLocationToWater :: Location -> Game
-      convertLocationToWater loc =
-        mempty & mapLayout .~ MapLayout (M.singleton loc Water)
+  let convertLocationToWater :: Location -> Either GameError Game
+      convertLocationToWater loc = executeIfEmpty
+        "Cannot convert to water"
+        loc
+        playerId
+        game
+        (pure $ mempty & mapLayout .~ MapLayout (M.singleton loc Water))
 
   not (locationsAreAdjacent loc1 loc2)
     `impliesInvalid` "Water must be placed in adjacent locations when using rain ceremony."
 
-  convertLoc1 <- executeIfEmpty "Cannot convert to water"
-                                loc1
-                                playerId
-                                game
-                                (pure $ convertLocationToWater loc1)
-
-  convertLoc2 <- executeIfEmpty "Cannot convert to water"
-                                loc2
-                                playerId
-                                game
-                                (pure $ convertLocationToWater loc2)
+  convert1 <- convertLocationToWater loc1
+  convert2 <- convertLocationToWater loc2
 
   pure $ mconcat
     [ game
-    , convertLoc1
-    , convertLoc2
+    , convert1
+    , convert2
     , paySpecialist RainCeremony 2 playerId
     , mempty & waterTiles .~ (-1)
     ]
@@ -207,14 +203,13 @@ executeIfEmpty
   -> Location
   -> PlayerId
   -> Game
-  -> Either GameError Game
-  -> Either GameError Game
+  -> Either GameError a
+  -> Either GameError a
 executeIfEmpty message location playerId game executeAction = do
   let mLocated = locatedAt location game
   let invalidMessage msg =
         invalidAction $ message <> " " <> pprintLocation location <> ": " <> msg
 
-  -- woo! what a world
   case mLocated of
     Nothing      -> invalidMessage "it's off the board!"
 
@@ -264,21 +259,23 @@ data Located
   | LocatedPlayerMonument Player Natural
   | LocatedPlayerCraftsman Player (Rotated Craftsman)
 
--- TODO: Technically there can be multiples here, do we care?
+-- TODO: Technically there can be multiples here, but I don't really care yet?
 playerMonumentAround :: Location -> Game -> Maybe (Player, Natural)
 playerMonumentAround location game = asum
-  $ map (`lookupMonument` game) neighborLocations
+  $ map (`lookupMonument` game) (locationNeighbors8 location)
  where
-  neighborLocations =
-    [ locationLeft location
-    , locationRight location
-    , locationAbove location
-    , locationBelow location
-    , locationLeft (locationAbove location)
-    , locationRight (locationAbove location)
-    , locationLeft (locationBelow location)
-    , locationRight (locationBelow location)
-    ]
+
+locationNeighbors8 :: Location -> [Location]
+locationNeighbors8 location =
+  [ locationLeft location
+  , locationRight location
+  , locationAbove location
+  , locationBelow location
+  , locationLeft (locationAbove location)
+  , locationRight (locationAbove location)
+  , locationLeft (locationBelow location)
+  , locationRight (locationBelow location)
+  ]
 
 locatedAt :: Location -> Game -> Maybe Located
 locatedAt location game =
@@ -352,7 +349,85 @@ placeCraftsmen
   -> PlayerId
   -> Game
   -> PlayerAction 'ReligionAndCulture
-placeCraftsmen = undefined
+placeCraftsmen placements playerId game = PlayerAction $ do
+  undefined
+
+placeCraftsman
+  :: Location -> Rotated Craftsman -> PlayerId -> Game -> Either GameError Game
+placeCraftsman location rCraftsman playerId game = do
+  let craftsman = getRotated rCraftsman
+      locations = coveredLocations location rCraftsman
+      isEmpty loc =
+        executeIfEmpty "Cannot place craftsman" loc playerId game (pure ())
+
+  playerHasCard <- playerHasCardOfType craftsman playerId game
+  newGame       <- if playerHasCard
+    then pure game
+    else takeCheapestTechnologyCard craftsman playerId game
+
+  -- Validate that all four locations are empty
+  traverse_ isEmpty locations
+
+  -- TODO: Validate that the craftsman is close enough to a resource of
+  -- the required type *that is also* not in range of another craftsman of the
+  -- same type. ooh baby, this sounds fun
+
+  let updates =
+        [ setPlayer playerId
+                    (mempty & craftsmen .~ M.singleton location rCraftsman)
+        ]
+
+  -- Initially set the price of the craftsman to 1.
+  -- Players can raise prices if they want using the 'raise-prices' command
+  undefined
+
+coveredLocations :: Location -> Rotated Craftsman -> [Location]
+coveredLocations Location {..} rCraftsman =
+  let (w, h) = rotatedDimensions rCraftsman
+      xs     = case w of
+        1 -> [locationX]
+        2 -> [locationX, succ locationX]
+        _ -> error "Dimensions are too large"
+      ys = case h of
+        1 -> [locationY]
+        2 -> [locationY, succ locationY]
+        _ -> error "Dimensions are too large"
+  in  Location <$> xs <*> ys
+
+-- TODO: only do this if player doesn't already have a technology card
+takeCheapestTechnologyCard
+  :: Craftsman -> PlayerId -> Game -> Either GameError Game
+takeCheapestTechnologyCard craftsman playerId game = do
+  case uncons =<< M.lookup craftsman (game ^. craftsmen) of
+    Nothing -> invalidAction
+      "There are no available technology cards of that type to take."
+    Just (card, cards) -> do
+      player <- getPlayer playerId game
+      playerHasCattle (technologyCardCost card) playerId game
+
+      let
+        updates =
+          [ subtractCattle (fromIntegral $ technologyCardCost card) playerId
+          , addVictoryPoints (fromIntegral $ technologyCardVictoryPoints card)
+                             playerId
+                             game
+          , addVictoryRequirement
+            (fromIntegral $ technologyCardVictoryRequirement card)
+            playerId
+            game
+          ]
+
+      -- NB. This insert looks problematic, but 'cards' is the _rest_ of the
+      -- cards after popping the first element, so we're actually deleting
+      -- the card that just got taken here.
+      pure $ (game & craftsmen %~ M.insert craftsman cards) <> mconcat updates
+
+playerHasCardOfType :: Craftsman -> PlayerId -> Game -> Either GameError Bool
+playerHasCardOfType craftsman playerId game = do
+  player <- getPlayer playerId game
+  pure $ isJust $ find
+    (\playerCard -> technologyCardCraftsmanType playerCard == craftsman)
+    (M.keys $ player ^. technologyCards)
 
 data RaiseMonumentCommand
   = UseHub Location
@@ -394,3 +469,37 @@ raisePrices
   -> Game
   -> PlayerAction 'ReligionAndCulture
 raisePrices = undefined
+
+-- DEPRECATED, but exploratory and cool
+
+--reachableWithoutHubsInNSteps
+  -- :: Natural -> Location -> MapLayout -> S.Set Location
+--reachableWithoutHubsInNSteps = undefined
+
+-- single step
+--reachableWithoutHubs
+  -- :: S.Set Location -> Location -> MapLayout -> S.Set Location
+--reachableWithoutHubs visitedLocations location layout = S.singleton location
+  -- <> mconcat (map (`fillWater` layout) neighbors)
+ --where
+  --neighbors =
+    --filter (`S.notMember` visitedLocations) (locationNeighbors8 location)
+
+  --fillWater :: Location -> MapLayout -> S.Set Location
+  --fillWater loc (MapLayout layout) = go S.empty (S.singleton loc) [loc]
+   --where
+    --go visited waters (loc : stack) = case M.lookup loc layout of
+      --Just Water ->
+        --let
+          --immediateNeighbors =
+            --locationNeighbors4 loc L.\\ (S.toList (visited <> visitedLocations))
+          --neighborSquares = mapMaybe
+            --(\loc -> (loc, ) <$> M.lookup loc layout)
+            --immediateNeighbors
+          --neighborWaters = filter (\(_, s) -> s == Water) neighborSquares
+        --in
+          --go (S.insert loc visited)
+             --(S.fromList (map fst neighborWaters) `S.union` waters)
+             --(map fst neighborWaters ++ stack)
+      --Nothing -> go visited waters stack
+    --go _ waters [] = waters

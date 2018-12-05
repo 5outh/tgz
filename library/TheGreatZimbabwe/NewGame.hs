@@ -92,7 +92,7 @@ newGameCraftsmen = M.fromList
 
   diamondCutters =
     [ TechnologyCard "DiamondCutter1" DiamondCutter 1 3 10
-    , TechnologyCard "DiamondCutter1" DiamondCutter 2 3 10
+    , TechnologyCard "DiamondCutter2" DiamondCutter 2 3 10
     ]
 
   vesselMakers =
@@ -102,10 +102,10 @@ newGameCraftsmen = M.fromList
 
   throneMakers =
     [ TechnologyCard "ThroneMaker1" ThroneMaker 3 2 4
-    , TechnologyCard "ThroneMaker1" ThroneMaker 4 2 4
+    , TechnologyCard "ThroneMaker2" ThroneMaker 4 2 4
     ]
 
   sculptors =
     [ TechnologyCard "Sculptor1" Sculptor 3 2 4
-    , TechnologyCard "Sculptor1" Sculptor 4 2 4
+    , TechnologyCard "Sculptor2" Sculptor 4 2 4
     ]

@@ -73,6 +73,8 @@ setPlayer :: PlayerId -> Player -> Game
 setPlayer playerId player =
   mempty { gamePlayers = M.singleton playerId player }
 
+-- TODO: This must be validated - a player can only go up to 40 VR:
+-- any actions that push them over that limit are disallowed.
 addVictoryRequirement :: Int -> PlayerId -> Game -> Game
 addVictoryRequirement pointsToAdd playerId game = setPlayer playerId stepPlayer
  where
@@ -97,4 +99,3 @@ subtractCattle n playerId = setPlayer playerId (mempty & cattle .~ (-n))
 
 newRound :: Game -> Either GameError Game
 newRound _ = internalError "cannot start a new round yet"
-

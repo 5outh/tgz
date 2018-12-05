@@ -158,6 +158,10 @@ deriveBoth defaultOptions ''Craftsman
 data Rotated a = Rotated a | UnRotated a
   deriving (Show, Eq, Ord, Generic)
 
+getRotated :: Rotated a -> a
+getRotated (Rotated   a) = a
+getRotated (UnRotated a) = a
+
 instance ToJSON a => ToJSON (Rotated a) where
   toJSON = genericToJSON defaultOptions
   toEncoding = genericToEncoding defaultOptions

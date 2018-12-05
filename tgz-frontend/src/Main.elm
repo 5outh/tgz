@@ -366,9 +366,10 @@ renderGame game =
           else
             div [] []
         , div [] [ listPlayers currentPlayerUsername (trace <| Dict.values game.state.players) ]
-
-        -- TODO: Only if Pre-Setup phase, and add choices
-        , renderPreSetupActionBoard game
+        , if game.state.round.currentPhase == Just PreSetup then
+            renderPreSetupActionBoard game
+          else
+            div [] []
         ]
 
 
@@ -421,12 +422,14 @@ renderPlayer isCurrentPlayer player =
             , ul []
                 [ li [] [ text ("Empire: " ++ playerEmpire) ]
                 , li [] [ text ("God: " ++ playerGod) ]
-                , if List.isEmpty player.specialists
-                  then div [] []
+                , if List.isEmpty player.specialists then
+                    div [] []
+
                   else
-                    li [] [ text
-                        ("Specialists: " ++ String.join ", " (List.map showSpecialist player.specialists))
-                    ]
+                    li []
+                        [ text
+                            ("Specialists: " ++ String.join ", " (List.map showSpecialist player.specialists))
+                        ]
                 , li [] [ text ("VR: " ++ String.fromInt player.victoryRequirement.points) ]
                 , li [] [ text ("VP: " ++ String.fromInt player.victoryPoints.points) ]
                 , li [] [ text ("🐄: " ++ String.fromInt player.cattle) ]
