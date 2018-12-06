@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TupleSections     #-}
 
 module TheGreatZimbabwe.NewGame where
 
@@ -51,19 +52,20 @@ newGame playerList = GameEvent <$> do
               }
             , roundCurrentPhase           = Just PreSetup
             }
-          gameSpecialists = allSpecialists
-          gameCraftsmen   = newGameCraftsmen
-          gameWinner      = Nothing
-          gameMapLayout   = layout
-          gameStep        = 0
+          gameSpecialists     = allSpecialists
+          gameTechnologyCards = newGameTechnologyCards
+          gameWinner          = Nothing
+          gameMapLayout       = layout
+          gameStep            = 0
           -- TODO: These need to be validated from the box.
-          gameWaterTiles  = 6
+          gameWaterTiles      = 6
           gameResourceTiles =
             M.fromList [(Clay, 4), (Wood, 4), (Ivory, 4), (Diamonds, 4)]
+          gameCraftsmanTiles = M.fromList $ map (, 3) [minBound ..]
       pure $ Right Game {..}
 
-newGameCraftsmen :: M.Map Craftsman [TechnologyCard]
-newGameCraftsmen = M.fromList
+newGameTechnologyCards :: M.Map Craftsman [TechnologyCard]
+newGameTechnologyCards = M.fromList
   [ Potter .: potters
   , IvoryCarver .: ivoryCarvers
   , WoodCarver .: woodCarvers

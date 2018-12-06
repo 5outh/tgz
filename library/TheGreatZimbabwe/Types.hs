@@ -144,7 +144,7 @@ data Craftsman
   | VesselMaker
   | ThroneMaker
   | Sculptor
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord, Show, Enum, Bounded)
 
 instance FromJSONKey Craftsman where
   fromJSONKey = FromJSONKeyValue parseJSON
@@ -494,8 +494,8 @@ data Game = Game
   -- ^ Current Round state
   , gameMapLayout :: MapLayout
   -- ^ Layout of the Map
-  , gameCraftsmen :: M.Map Craftsman [TechnologyCard]
-  -- ^ Remaining Craftsmen of each type
+  , gameTechnologyCards :: M.Map Craftsman [TechnologyCard]
+  -- ^ Remaining Technology Cards of each type
   , gameGods :: S.Set God
   -- ^ Remaining Gods
   , gameSpecialists :: S.Set Specialist
@@ -508,6 +508,8 @@ data Game = Game
   -- ^ Remaining resource tiles in the game
   , gameWaterTiles :: Int
   -- ^ Remaining water tiles
+  , gameCraftsmanTiles :: M.Map Craftsman Int
+  -- ^ Remaining craftsman tiles of each type
   } deriving (Generic, Show)
 
 instance Semigroup Game where
@@ -516,17 +518,18 @@ instance Semigroup Game where
     , gameRound = on (<>) gameRound g1 g2
     -- Need 'flip' if we want to overwrite keys in a map.
     , gameMapLayout = on (flip (<>)) gameMapLayout g1 g2
-    , gameCraftsmen = on (M.unionWith (<>)) gameCraftsmen g1 g2
+    , gameTechnologyCards = on (M.unionWith (<>)) gameTechnologyCards g1 g2
     , gameGods = on (<>) gameGods g1 g2
     , gameSpecialists = on (<>) gameSpecialists g1 g2
     , gameWinner = on (<|>) gameWinner g1 g2
     , gameStep = on (+) gameStep g1 g2
     , gameResourceTiles = on (M.unionWith (+)) gameResourceTiles g1 g2
     , gameWaterTiles = on (+) gameWaterTiles g1 g2
+    , gameCraftsmanTiles = on (M.unionWith (+)) gameCraftsmanTiles g1 g2
     }
 
 instance Monoid Game where
-  mempty = Game mempty mempty mempty mempty mempty mempty Nothing 0 mempty 0
+  mempty = Game mempty mempty mempty mempty mempty mempty Nothing 0 mempty 0 mempty
 
 deriveBoth (unPrefix "game") ''Game
 makeLensesWith camelCaseFields ''Game

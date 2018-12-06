@@ -74,7 +74,6 @@ chooseSpecialist specialist playerId game = PlayerAction $ do
                              playerId
                              mempty
 
--- TODO: Resource tiles are limited.
 useShaman
   :: Resource
   -> Location
@@ -330,6 +329,7 @@ lookupCraftsman location game = asum
         guard (rotatedDimensions craftsman == dimension)
         pure (player, craftsman)
 
+-- TODO: Craftsmen are limited (add them to the supply)
 placeCraftsmen
   :: [(Location, Rotated Craftsman)]
   -- ^ Note: This can be empty just to trigger a 'raisePrices' command.
@@ -433,7 +433,6 @@ reachableLocationsUsingOneHub mapGraph startingLocations game = do
 
   pure $ reachableByOneHub <> reachableLocations
 
--- | Gather all covered locations of a craftsman of some type on the board.
 findCraftsmanLocations :: Craftsman -> Game -> Either GameError (S.Set Location)
 findCraftsmanLocations craftsman game = do
   players <- getPlayers game
@@ -460,7 +459,7 @@ coveredLocations Location {..} rCraftsman =
 takeCheapestTechnologyCard
   :: Craftsman -> PlayerId -> Game -> Either GameError Game
 takeCheapestTechnologyCard craftsman playerId game = do
-  case uncons =<< M.lookup craftsman (game ^. craftsmen) of
+  case uncons =<< M.lookup craftsman (game ^. technologyCards) of
     Nothing -> invalidAction
       "There are no available technology cards of that type to take."
     Just (card, cards) -> do
@@ -482,7 +481,9 @@ takeCheapestTechnologyCard craftsman playerId game = do
       -- NB. This insert looks problematic, but 'cards' is the _rest_ of the
       -- cards after popping the first element, so we're actually deleting
       -- the card that just got taken here.
-      pure $ (game & craftsmen %~ M.insert craftsman cards) <> mconcat updates
+      pure
+        $  (game & technologyCards %~ M.insert craftsman cards)
+        <> mconcat updates
 
 playerHasCardOfType :: Craftsman -> PlayerId -> Game -> Either GameError Bool
 playerHasCardOfType craftsman playerId game = do
