@@ -14,11 +14,13 @@ import qualified Data.Map.Strict             as M
 import           Data.Maybe
 import qualified Data.Set                    as S
 import           Data.Text                   (Text)
+import           Data.Traversable            (for)
 import           Debug.Trace
 import           Elm.Derive
 import           GHC.Natural
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Game
+import           TheGreatZimbabwe.MapLayout
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
 import           TheGreatZimbabwe.Validation
@@ -265,18 +267,6 @@ playerMonumentAround location game = asum
   $ map (`lookupMonument` game) (locationNeighbors8 location)
  where
 
-locationNeighbors8 :: Location -> [Location]
-locationNeighbors8 location =
-  [ locationLeft location
-  , locationRight location
-  , locationAbove location
-  , locationBelow location
-  , locationLeft (locationAbove location)
-  , locationRight (locationAbove location)
-  , locationLeft (locationBelow location)
-  , locationRight (locationBelow location)
-  ]
-
 locatedAt :: Location -> Game -> Maybe Located
 locatedAt location game =
   let layout     = mapLayoutMapLayout $ (gameMapLayout game)
@@ -340,23 +330,25 @@ lookupCraftsman location game = asum
         guard (rotatedDimensions craftsman == dimension)
         pure (player, craftsman)
 
--- TODO: This triggers a player taking a technology card if possible
--- TODO: Craftsmen have shapes, which must be validated. Location is top-left
--- of Craftsman tile
 placeCraftsmen
   :: [(Location, Rotated Craftsman)]
   -- ^ Note: This can be empty just to trigger a 'raisePrices' command.
   -> PlayerId
   -> Game
   -> PlayerAction 'ReligionAndCulture
-placeCraftsmen placements playerId game = PlayerAction $ do
-  undefined
+placeCraftsmen placements playerId game0 = PlayerAction $ go placements game0
+ where
+  go :: [(Location, Rotated Craftsman)] -> Game -> Either GameError Game
+  go []                              game1 = pure game1
+  go ((location, rCraftsman) : rest) game1 = do
+    game2 <- placeCraftsman location rCraftsman playerId game1
+    go rest game2
 
 placeCraftsman
   :: Location -> Rotated Craftsman -> PlayerId -> Game -> Either GameError Game
 placeCraftsman location rCraftsman playerId game = do
-  let craftsman = getRotated rCraftsman
-      locations = coveredLocations location rCraftsman
+  let craftsman          = getRotated rCraftsman
+      craftsmanLocations = coveredLocations location rCraftsman
       isEmpty loc =
         executeIfEmpty "Cannot place craftsman" loc playerId game (pure ())
 
@@ -366,11 +358,56 @@ placeCraftsman location rCraftsman playerId game = do
     else takeCheapestTechnologyCard craftsman playerId game
 
   -- Validate that all four locations are empty
-  traverse_ isEmpty locations
+  traverse_ isEmpty craftsmanLocations
 
-  -- TODO: Validate that the craftsman is close enough to a resource of
+  -- Validate that the craftsman is close enough to a resource of
   -- the required type *that is also* not in range of another craftsman of the
-  -- same type. ooh baby, this sounds fun
+  -- same type.
+
+  -- 1. get coordinates of other craftsmen of the same type
+  badCoordinates <- findCraftsmanLocations craftsman game
+
+  -- 2. get coordinates of required resources
+  let MapLayout layout            = game ^. mapLayout
+      requiredResourceCoordinates = M.keys
+        $ M.filter (== Land (Resource (craftsmanResource craftsman))) layout
+
+  -- 3. find all spaces 3 steps away from each required resource location.
+  let mapGraph              = constructMapGraph (game ^. mapLayout)
+      reachableLocationSets = flip map requiredResourceCoordinates
+        $ \location -> mapConnectionsN 3 mapGraph (S.singleton location)
+
+  -- 4. check, for each resource location:
+  -- (a) no coordinates of craftsmen of the same type (badCoordinates) are in set
+  -- (b) at least one coordinate of coveredLocations is in the set
+  let
+    validPlacement = or $ flip map reachableLocationSets $ \locationSet ->
+      S.null (locationSet `S.intersection` badCoordinates)
+        && not
+             (S.null
+               (locationSet `S.intersection` (S.fromList craftsmanLocations))
+             )
+
+  not validPlacement
+    `impliesInvalid` "Craftsman is not close enough to an unclaimed, required resource."
+
+  -- Validate secondary craftsman placement if applicable
+  for (craftsmanAssociatedCraftsman craftsman) $ \associatedCraftsman -> do
+    associatedCraftsmanLocations <- findCraftsmanLocations associatedCraftsman
+                                                           game
+
+    S.null associatedCraftsmanLocations `impliesInvalid` mconcat
+      [ "None of the associated primary craftsmen ("
+      , tshow associatedCraftsman
+      , ") have been built yet."
+      ]
+
+    reachableLocations <- reachableLocationsUsingOneHub
+      mapGraph
+      (S.fromList craftsmanLocations)
+      game
+    S.null (reachableLocations `S.intersection` associatedCraftsmanLocations)
+      `impliesInvalid` "Secondary craftsmen must be placed within range of primary craftsman (using hubs)."
 
   let updates =
         [ setPlayer playerId
@@ -379,7 +416,33 @@ placeCraftsman location rCraftsman playerId game = do
 
   -- Initially set the price of the craftsman to 1.
   -- Players can raise prices if they want using the 'raise-prices' command
-  undefined
+
+  -- TODO: Add raise-prices command which is only valid after place-craftsmen
+  pure $ newGame <> mconcat updates
+
+reachableLocationsUsingOneHub
+  :: MapGraph -> S.Set Location -> Game -> Either GameError (S.Set Location)
+reachableLocationsUsingOneHub mapGraph startingLocations game = do
+  allPlayers <- getPlayers game
+  let
+    reachableLocations = mapConnectionsN 3 mapGraph startingLocations
+    allHubLocations =
+      S.fromList . M.keys . mconcat $ map playerMonuments allPlayers
+    reachableHubLocations = allHubLocations `S.intersection` reachableLocations
+    reachableByOneHub     = mapConnectionsN 3 mapGraph startingLocations
+
+  pure $ reachableByOneHub <> reachableLocations
+
+-- | Gather all covered locations of a craftsman of some type on the board.
+findCraftsmanLocations :: Craftsman -> Game -> Either GameError (S.Set Location)
+findCraftsmanLocations craftsman game = do
+  players <- getPlayers game
+  let allCraftsmenOnBoard = M.unions (map playerCraftsmen players)
+      craftsmenOfSameType = M.filter
+        (\otherCraftsman -> getRotated otherCraftsman == craftsman)
+        allCraftsmenOnBoard
+  pure $ S.fromList . concatMap (uncurry coveredLocations) $ M.toList
+    craftsmenOfSameType
 
 coveredLocations :: Location -> Rotated Craftsman -> [Location]
 coveredLocations Location {..} rCraftsman =
@@ -394,7 +457,6 @@ coveredLocations Location {..} rCraftsman =
         _ -> error "Dimensions are too large"
   in  Location <$> xs <*> ys
 
--- TODO: only do this if player doesn't already have a technology card
 takeCheapestTechnologyCard
   :: Craftsman -> PlayerId -> Game -> Either GameError Game
 takeCheapestTechnologyCard craftsman playerId game = do
@@ -469,37 +531,3 @@ raisePrices
   -> Game
   -> PlayerAction 'ReligionAndCulture
 raisePrices = undefined
-
--- DEPRECATED, but exploratory and cool
-
---reachableWithoutHubsInNSteps
-  -- :: Natural -> Location -> MapLayout -> S.Set Location
---reachableWithoutHubsInNSteps = undefined
-
--- single step
---reachableWithoutHubs
-  -- :: S.Set Location -> Location -> MapLayout -> S.Set Location
---reachableWithoutHubs visitedLocations location layout = S.singleton location
-  -- <> mconcat (map (`fillWater` layout) neighbors)
- --where
-  --neighbors =
-    --filter (`S.notMember` visitedLocations) (locationNeighbors8 location)
-
-  --fillWater :: Location -> MapLayout -> S.Set Location
-  --fillWater loc (MapLayout layout) = go S.empty (S.singleton loc) [loc]
-   --where
-    --go visited waters (loc : stack) = case M.lookup loc layout of
-      --Just Water ->
-        --let
-          --immediateNeighbors =
-            --locationNeighbors4 loc L.\\ (S.toList (visited <> visitedLocations))
-          --neighborSquares = mapMaybe
-            --(\loc -> (loc, ) <$> M.lookup loc layout)
-            --immediateNeighbors
-          --neighborWaters = filter (\(_, s) -> s == Water) neighborSquares
-        --in
-          --go (S.insert loc visited)
-             --(S.fromList (map fst neighborWaters) `S.union` waters)
-             --(map fst neighborWaters ++ stack)
-      --Nothing -> go visited waters stack
-    --go _ waters [] = waters

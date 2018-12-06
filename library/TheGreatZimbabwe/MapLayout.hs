@@ -1,5 +1,7 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections   #-}
+{-# LANGUAGE LambdaCase       #-}
+{-# LANGUAGE RecordWildCards  #-}
+{-# LANGUAGE TupleSections    #-}
+{-# LANGUAGE TypeApplications #-}
 module TheGreatZimbabwe.MapLayout where
 
 import           Control.Lens
@@ -160,7 +162,6 @@ locationNeighbors4 location =
   , locationBelow location
   ]
 
--- TODO: Dedupe
 locationNeighbors8 :: Location -> [Location]
 locationNeighbors8 location =
   [ locationLeft location
@@ -196,8 +197,29 @@ data MapGraph = MapGraph
   { mapGraphNodes      :: M.Map Location MapNode
   , mapGraphWaterNodes :: M.Map Int (S.Set Location)
   , mapGraphEdges      :: M.Map MapNode (S.Set MapNode)
-  -- ^ TODO: this is inefficient, want to collect in a set
-  }
+  } deriving (Show, Eq)
+
+mapConnectionsN :: Int -> MapGraph -> S.Set Location -> S.Set Location
+mapConnectionsN 0 graph locations = locations
+mapConnectionsN n graph locations =
+  let connections = mapConnectionsMany graph locations
+  in  connections <> mapConnectionsN (n - 1) graph connections
+
+mapConnectionsMany :: MapGraph -> S.Set Location -> S.Set Location
+mapConnectionsMany graph locations =
+  S.unions $ S.toList $ S.map (mapConnections graph) locations
+
+mapConnections :: MapGraph -> Location -> S.Set Location
+mapConnections MapGraph {..} location = case M.lookup location mapGraphNodes of
+  Just node ->
+    let mEdges      = M.lookup node mapGraphEdges
+        toLocations = \case
+          WaterNode key       -> M.lookup key mapGraphWaterNodes
+          LandNode  location1 -> Just (S.singleton location1)
+    in  case mEdges of
+          Nothing    -> S.empty
+          Just edges -> mconcat $ mapMaybe toLocations (S.toList edges)
+  Nothing -> S.empty
 
 constructMapGraph :: MapLayout -> MapGraph
 constructMapGraph mapLayout@(MapLayout layout) =
@@ -223,10 +245,11 @@ constructMapGraph mapLayout@(MapLayout layout) =
                mconcat $ M.elems (mapGraphWaterNodes graph)
 
              waterBody = fillWater key mapLayout
-             newGraph  = graph
-               { mapGraphNodes      = M.insert key
-                                               (WaterNode waterKey)
-                                               (mapGraphNodes graph)
+             -- Mappings from each location in the water to the water node.
+             locationMappings =
+               M.fromList $ map (, WaterNode waterKey) $ S.toList waterBody
+             newGraph = graph
+               { mapGraphNodes = locationMappings `M.union` mapGraphNodes graph
                , mapGraphWaterNodes = M.insert waterKey
                                                waterBody
                                                (mapGraphWaterNodes graph)
