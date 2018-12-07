@@ -39,7 +39,9 @@ fromPlayerId (PlayerId playerId) = toSqlKey (fromIntegral playerId)
 toPlayerInfoWithId :: Entity User -> (PlayerId, PlayerInfo)
 toPlayerInfoWithId (Entity playerId (User {..})) =
   ( PlayerId . fromIntegral $ fromSqlKey playerId
-  , PlayerInfo (Username userUsername) userEmail
+  , PlayerInfo (Username userUsername)
+               userEmail
+               (PlayerId . fromIntegral $ fromSqlKey playerId)
   )
 
 data UserView = UserView

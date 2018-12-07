@@ -5,6 +5,7 @@ import           Control.Lens
 import           Data.List              (elemIndex)
 import qualified Data.Map.Strict        as M
 import qualified Data.Set               as S
+import qualified Data.Text              as T
 import           Elm.Derive
 import           GHC.Natural
 import           Prelude                hiding (round)
@@ -99,3 +100,8 @@ subtractCattle n playerId = setPlayer playerId (mempty & cattle .~ (-n))
 
 newRound :: Game -> Either GameError Game
 newRound _ = internalError "cannot start a new round yet"
+
+fromMaybeError :: T.Text -> Maybe a -> Either GameError a
+fromMaybeError message ma = case ma of
+  Nothing -> internalError message
+  Just a  -> pure a

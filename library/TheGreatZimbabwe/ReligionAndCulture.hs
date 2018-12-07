@@ -9,10 +9,13 @@
 {-# LANGUAGE TupleSections          #-}
 module TheGreatZimbabwe.ReligionAndCulture where
 
+import           Prelude                     hiding (round)
+
 import           Control.Applicative
 import           Control.Lens
 import           Control.Monad
 import           Data.Foldable
+import           Data.Function               (on)
 import qualified Data.List                   as L
 import qualified Data.Map.Strict             as M
 import           Data.Maybe
@@ -536,33 +539,6 @@ playerHasCardOfType craftsman playerId game = do
     (\playerCard -> technologyCardCraftsmanType playerCard == craftsman)
     (M.keys $ player ^. technologyCards)
 
--- Raise the price of a technology card. Only possible after placing craftsmen.
-raisePrice :: Craftsman -> Int -> PlayerId -> Game -> Either GameError Game
-raisePrice craftsman newPrice playerId game = do
-  (newPrice > 3 || newPrice < 1)
-    `impliesInvalid` "Price must be between 1 and 3."
-
-  player <- getPlayer playerId game
-
-  let availableTechnologyCards = M.toList (player ^. technologyCards)
-      mTechnologyCard          = find
-        ((== craftsman) . technologyCardCraftsmanType . fst)
-        availableTechnologyCards
-
-  case mTechnologyCard of
-    Nothing -> invalidAction $ mconcat
-      [ "Cannot raise price of a "
-      , tshow craftsman
-      , ": you do not have the necessary Technology Card."
-      ]
-
-    Just (card, cardPrice) -> do
-      (cardPrice <= fromIntegral newPrice)
-        `impliesInvalid` "Price must increase."
-      pure $ game <> setPlayer
-        playerId
-        (mempty & technologyCards .~ M.singleton card (fromIntegral newPrice))
-
 setPrices
   :: [(Int, Craftsman)] -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 setPrices prices playerId game = PlayerAction $ do
@@ -607,10 +583,42 @@ setPrice craftsman newPrice playerId game = do
       , ": you do not have the necessary Technology Card."
       ]
 
-    Just (card, cardPrice) -> do
+    Just (card, cardState) -> do
       pure $ game <> setPlayer
         playerId
-        (mempty & technologyCards .~ M.singleton card (fromIntegral newPrice))
+        (mempty & technologyCards .~ M.singleton card
+                                                 (mempty & price .~ newPrice)
+        )
+
+-- Raise the price of a technology card. Only possible after placing craftsmen.
+raisePrice :: Craftsman -> Int -> PlayerId -> Game -> Either GameError Game
+raisePrice craftsman newPrice playerId game = do
+  (newPrice > 3 || newPrice < 1)
+    `impliesInvalid` "Price must be between 1 and 3."
+
+  player <- getPlayer playerId game
+
+  let availableTechnologyCards = M.toList (player ^. technologyCards)
+      mTechnologyCard          = find
+        ((== craftsman) . technologyCardCraftsmanType . fst)
+        availableTechnologyCards
+
+  case mTechnologyCard of
+    Nothing -> invalidAction $ mconcat
+      [ "Cannot raise price of a "
+      , tshow craftsman
+      , ": you do not have the necessary Technology Card."
+      ]
+
+    Just (card, TechnologyCardState {..}) -> do
+      (technologyCardStatePrice <= fromIntegral newPrice)
+        `impliesInvalid` "Price must increase."
+      pure $ game <> setPlayer
+        playerId
+        (mempty & technologyCards .~ M.singleton
+          card
+          (mempty & price .~ fromIntegral newPrice)
+        )
 
 data RaiseMonumentCommand
   = UseHub Location
@@ -621,33 +629,12 @@ data RaiseMonumentCommand
 
 deriveBoth defaultOptions ''RaiseMonumentCommand
 
--- TODO: This can affect the game state in a variety of ways. need some sequence
--- of commands from the player to execute this action. This is the heft of the
--- game logic.
---
--- TODO: I would like to be able to return an incomplete preview here.
-raiseMonuments
-  :: [(Location, [RaiseMonumentCommand])]
-  -- ^ For each location user wants to raise, a sequence of commands done in
-  -- order to raise it.
-  -> PlayerId
-  -> Game
-  -> PlayerAction 'ReligionAndCulture
-raiseMonuments commands playerId game = undefined
- where
-  -- NB. This is just for reference; all should be contained in
-  -- 'RaiseMonumentCommand'
-  obtainRitualGoods     = undefined
-  useResource           = undefined
-  useSecondaryCraftsman = undefined
-  mapGraph              = constructMapGraph (game ^. mapLayout)
-
 data RaiseMonumentState = RaiseMonumentState
-  { raiseMonumentStateCurrentLocation :: Location
+  { raiseMonumentStateCurrentLocation :: Maybe Location
   -- ^ The player's "current location"
   , raiseMonumentStateRitualGoodHeld  :: Maybe Craftsman
   -- ^ You either have nothing yet, or a ritual good from a craftsman (primary or secondary).
-  , raiseMonumentStateCraftsmenUsed   :: S.Set Resource
+  , raiseMonumentStateResourcesUsed   :: S.Set Resource
   -- ^ Track the types of Resource already used *to raise a monument* this turn.
   -- NB. the bolded statement is important because you can use resources to pay
   -- primary craftsmen on the way to a secondary. that doesn't count against you
@@ -655,6 +642,24 @@ data RaiseMonumentState = RaiseMonumentState
   }
 
 makeLensesWith camelCaseFields 'RaiseMonumentState
+
+instance Semigroup RaiseMonumentState where
+  a <> b = RaiseMonumentState
+    { raiseMonumentStateCurrentLocation =
+        lastMay (raiseMonumentStateCurrentLocation a) (raiseMonumentStateCurrentLocation b)
+    , raiseMonumentStateRitualGoodHeld = lastMay (raiseMonumentStateRitualGoodHeld a)
+        (raiseMonumentStateRitualGoodHeld b)
+    , raiseMonumentStateResourcesUsed = on (<>) raiseMonumentStateResourcesUsed a b
+    }
+   where
+    lastMay a b = case (a, b) of
+          (Nothing, Nothing) -> Nothing
+          (Just a, Nothing)  -> Just a
+          (Nothing, Just b)  -> Just b
+          (Just a, Just b)   -> Just b
+
+instance Monoid RaiseMonumentState where
+  mempty = RaiseMonumentState Nothing Nothing S.empty
 
 -- Assumption: Everything up until this point has been validated. We don't need
 -- to trace steps back to make sure we're raising a valid monument.
@@ -689,10 +694,23 @@ raiseMonument1 playerId mapGraph state@(RaiseMonumentState {..}) game = \case
             reachableFromCraftsman =
               mapConnectionsN transportationRange mapGraph (craftsmanLocations)
             theCraftsman = getRotated rotatedCraftsman
+            theResource  = craftsmanResource theCraftsman
+            theGod       = playerGod player
+
+        (technologyCard, technologyCardState) <-
+          fromMaybeError "Technology Card for Craftsman not found in owner"
+          $ find
+              (\(card, _) -> technologyCardCraftsmanType card == theCraftsman)
+          $ M.toList (owner ^. technologyCards)
+
+        let costToUseCraftsman = technologyCardStatePrice technologyCardState
 
         -- can the player reach the craftsman?
+        currentLocation <- fromMaybeError
+          "Current location should not be empty"
+          raiseMonumentStateCurrentLocation
 
-        (raiseMonumentStateCurrentLocation `S.notMember` reachableFromCraftsman)
+        (currentLocation `S.notMember` reachableFromCraftsman)
           `impliesInvalid` (  "You cannot reach the craftsman at "
                            <> pprintLocation craftsmanLocation
                            <> "."
@@ -709,38 +727,151 @@ raiseMonument1 playerId mapGraph state@(RaiseMonumentState {..}) game = \case
                            )
 
         -- can the player validly use this craftsman this turn (have they used before, and are not tsui-goab?)
+        (          theResource
+          `S.member` raiseMonumentStateResourcesUsed
+          &&         theGod
+          /=         Just TsuiGoab
+          )
+          `impliesInvalid` (  "You have already used "
+                           <> tshow theResource
+                           <> " to raise this monument this turn."
+                           )
 
         -- does the player have enough money to pay for the ritual good?
+        playerHasCattle (fromIntegral costToUseCraftsman) playerId game
 
         -- has the resource already been used (a used marker is there, and not Atete/used twice?)?
+        let usedMarkers' = game ^. round . usedMarkers
+            threshold    = if player ^. god == Just Atete then 2 else 1
+
+        (fromMaybe 0 (M.lookup resourceLocation usedMarkers') >= threshold)
+          `impliesError` "Cannot use that resource: it has already been used this round."
 
         -- if all are fine, add a used marker to resource and update state
+
+        ownerId <-
+          fromMaybeError "Cannot find owner"
+          $   playerInfoPlayerId
+          <$> (owner ^. info)
+
+        let
+          gameUpdates =
+            [ mempty
+              &  round
+              .  usedMarkers
+              .~ M.singleton resourceLocation 1
+            -- Add cost to use craftsman to tech card
+            , setPlayer
+              ownerId
+              (mempty & technologyCards .~ M.singleton
+                technologyCard
+                (mempty & cattle .~ costToUseCraftsman)
+              )
+            -- spend cattle
+            , subtractCattle costToUseCraftsman playerId
+            ]
+          stateUpdates =
+            [ mempty
+              { raiseMonumentStateCurrentLocation = Just craftsmanLocation
+              }
+            , mempty & ritualGoodHeld .~ Just theCraftsman
+            , mempty & resourcesUsed .~ S.singleton theResource
+            ]
+
+        let associatedPrimaryCraftsman =
+              craftsmanAssociatedCraftsman theCraftsman
+        doesSecondaryCraftsmanExist <- secondaryCraftsmanExists theCraftsman
+                                                                game
 
         -- is it finished:
         --  - primary craftsman => secondary does not exist on board yet
         --  - secondary craftsman => holding primary ritual good
+        if (  not doesSecondaryCraftsmanExist
+           && isNothing associatedPrimaryCraftsman
+           )
+        then
+          case commands of
+            [] -> pure (game <> mconcat gameUpdates, commands)
+            _ ->
+              invalidAction
+                "There are additional commands after obtaining and delivering ritual goods."
+        else
+          do
+            -- if this *is* the secondary craftsman, validate that the primary
+            -- ritual good is held
+            case associatedPrimaryCraftsman of
+              Just primary -> do
+                (raiseMonumentStateRitualGoodHeld /= Just primary)
+                  `impliesInvalid` "You have not obtained the necessary resources to pay this secondary craftsman."
+                pure (game <> mconcat gameUpdates, commands)
+                -- not primary, shouldn't be on the board if the secondary craftsman doesn't exist
+              Nothing ->
+                internalError
+                  "Searching for primary craftsman, but secondary craftsman doesn't exist"
 
-        undefined
-
-
-    undefined
+            raiseMonument1 playerId
+                           mapGraph
+                           (state <> mconcat stateUpdates)
+                           (game <> mconcat gameUpdates)
+                           commands
 
   (UseHub hubLocation : commands) -> do
     player <- getPlayer playerId game
     playerHasCattle 1 playerId game
 
+    currentLocation <- fromMaybeError "Current location should not be empty"
+                                      raiseMonumentStateCurrentLocation
+
     let transportationRange = if player ^. god == Just Eshu then 6 else 3
-        reachable           = mapConnectionsN
-          transportationRange
-          mapGraph
-          (S.singleton raiseMonumentStateCurrentLocation)
+        reachable           = mapConnectionsN transportationRange
+                                              mapGraph
+                                              (S.singleton currentLocation)
 
     (hubLocation `S.notMember` reachable)
       `impliesInvalid` "You are not within range of that hub."
 
-    let newGame  = game <> subtractCattle 1 playerId
-        newState = state & currentLocation .~ hubLocation
+    let newGame = game <> subtractCattle 1 playerId
+        newState =
+          state { raiseMonumentStateCurrentLocation = Just hubLocation }
 
     raiseMonument1 playerId mapGraph newState newGame commands
 
   [] -> pure undefined -- ???
+
+-- | Returns true if the secondary craftsman exists for the given craftsman
+--
+-- Returns 'False' if a secondary craftsman is passed in.
+--
+secondaryCraftsmanExists :: Craftsman -> Game -> Either GameError Bool
+secondaryCraftsmanExists craftsman game = do
+  players    <- getPlayers game
+  mLocations <-
+    for (craftsmanSecondaryCraftsman craftsman) $ \associatedCraftsman -> do
+      findCraftsmanLocations associatedCraftsman game
+  pure $ S.null (fromMaybe S.empty mLocations)
+
+-- TODO: This can affect the game state in a variety of ways. need some sequence
+-- of commands from the player to execute this action. This is the heft of the
+-- game logic.
+--
+-- TODO: I would like to be able to return an incomplete preview here.
+raiseMonuments
+  :: [(Location, [RaiseMonumentCommand])]
+  -- ^ For each location user wants to raise, a sequence of commands done in
+  -- order to raise it.
+  -> PlayerId
+  -> Game
+  -> PlayerAction 'ReligionAndCulture
+raiseMonuments raiseMonumentCommands playerId game = PlayerAction $ do
+  foldM
+    (\game0 (location, commands) ->
+      fst <$> raiseMonument1 playerId mapGraph (mkState location) game0 commands
+    )
+    game
+    raiseMonumentCommands
+ where
+  -- NB. This is just for reference; all should be contained in
+  -- 'RaiseMonumentCommand'
+  mkState location =
+    mempty { raiseMonumentStateCurrentLocation = Just location }
+  mapGraph = constructMapGraph (game ^. mapLayout)

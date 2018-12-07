@@ -81,6 +81,8 @@ data PlayerInfo = PlayerInfo
   -- ^ A Player's unique username
   , playerInfoEmail    :: T.Text
   -- ^ A Player's unique email address
+  , playerInfoPlayerId :: PlayerId
+  -- ^ The Id of the player.
   } deriving (Generic, Show)
 
 deriveBoth (unPrefix "playerInfo") ''PlayerInfo
@@ -181,12 +183,21 @@ craftsmanResource = \case
   ThroneMaker   -> Wood
   Sculptor      -> Wood
 
--- | Associated Craftsman for tier 2 Craftsmen
+-- | Associated Primary Craftsman for Secondary Craftsmen
 craftsmanAssociatedCraftsman :: Craftsman -> Maybe Craftsman
 craftsmanAssociatedCraftsman = \case
   VesselMaker -> Just Potter
   ThroneMaker -> Just IvoryCarver
   Sculptor    -> Just WoodCarver
+  _           -> Nothing
+
+
+-- The secondary craftsman for a craftman
+craftsmanSecondaryCraftsman :: Craftsman -> Maybe Craftsman
+craftsmanSecondaryCraftsman = \case
+  Potter      -> Just VesselMaker
+  IvoryCarver -> Just ThroneMaker
+  WoodCarver  -> Just Sculptor
   _           -> Nothing
 
 -- | Dimensions of placed Craftsmen. Width x Height.
@@ -208,6 +219,25 @@ rotatedDimensions (Rotated   c) = swap (craftsmanDimensions c)
 data PrimaryOrSecondary = Primary | Secondary
 
 deriveBoth defaultOptions ''PrimaryOrSecondary
+
+data TechnologyCardState = TechnologyCardState
+  { technologyCardStatePrice :: Int
+  -- ^ Amount others must pay to use the technology card
+  , technologyCardStateCattle :: Int
+  -- ^ Cattle on this
+  } deriving (Show, Eq, Ord)
+
+deriveBoth (unPrefix "technologyCardState") ''TechnologyCardState
+makeLensesWith camelCaseFields ''TechnologyCardState
+
+instance Semigroup TechnologyCardState where
+  a <> b = TechnologyCardState
+    { technologyCardStatePrice  = on (+) technologyCardStatePrice a b
+    , technologyCardStateCattle  = on (+) technologyCardStateCattle a b
+    }
+
+instance Monoid TechnologyCardState where
+  mempty = TechnologyCardState 0 0
 
 data TechnologyCard = TechnologyCard
   { technologyCardName               :: T.Text
@@ -357,7 +387,7 @@ data Player = Player
   -- ^ Locations of player-owned monuments on the map, along with monument height
   , playerCraftsmen          :: M.Map Location (Rotated Craftsman)
   -- ^ Locations of player-owned craftsmen on the map
-  , playerTechnologyCards    :: M.Map TechnologyCard Int
+  , playerTechnologyCards    :: M.Map TechnologyCard TechnologyCardState
   -- ^ Player-owned technology cards, along with the price other players must
   -- pay to use them
   , playerSpecialists        :: M.Map Specialist Int
@@ -377,7 +407,7 @@ instance Semigroup Player where
     , playerCattle = on (+) playerCattle p1 p2
     , playerMonuments = on (M.unionWith (+)) playerMonuments p1 p2
     , playerCraftsmen = on (<>) playerCraftsmen p1 p2
-    , playerTechnologyCards = on M.union playerTechnologyCards p1 p2
+    , playerTechnologyCards = on (M.unionWith (<>)) playerTechnologyCards p1 p2
     -- ^ New prices overwrite old ones.
     , playerSpecialists = on (M.unionWith (+)) playerSpecialists p1 p2
     , playerGod = on (<|>) playerGod p1 p2
@@ -465,7 +495,7 @@ data Round = Round
   -- (b) by the generosity of kings phase in other phases.
   , roundCurrentPlayer          :: Maybe PlayerId
   -- ^ The current player of the round
-  , roundUsedMarkers            :: M.Map Location UsedMarker
+  , roundUsedMarkers            :: M.Map Location Int
   -- ^ Used marker locations on the map
   , roundGenerosityOfKingsState :: GenerosityOfKingsState
   -- ^ State used in the Generosity of kings phase
@@ -477,7 +507,7 @@ instance Semigroup Round where
   r1 <> r2 = Round
     { roundPlayers = on (<>) roundPlayers r1 r2
     , roundCurrentPlayer = on appendLast roundCurrentPlayer r1 r2
-    , roundUsedMarkers = on (<>) roundUsedMarkers r1 r2
+    , roundUsedMarkers = on (M.unionWith (+)) roundUsedMarkers r1 r2
     , roundGenerosityOfKingsState = on (<>) roundGenerosityOfKingsState r1 r2
     , roundCurrentPhase = on appendLast roundCurrentPhase r1 r2
     }
