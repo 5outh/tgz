@@ -273,17 +273,17 @@ data God
   | Elegua
   -- ^ Use up to 3 cattle from common stock on first bid in Generosity of Kings
   | Dziva
-  -- ^ Can raise/lower prices at beginning of their turn
+  -- ^ Can raise/lower prices at beginning of their turn (separate action)
   | Eshu
   -- ^ Raise transportation range to 6
   | Gu
-  -- ^ Makes all tech cards cost 1 (even retroactively)
+  -- ^ Makes all tech cards cost 1 VR (even retroactively)
   | Obatala
   -- ^ May place 2 monuments instead of 1 when placing monuments
   | Atete
   -- ^ May use each resource a second time
   | TsuiGoab
-  -- ^ Does not need to use different resources to raise monumens
+  -- ^ Does not need to use different resources to raise monuments
   | Anansi
   -- ^ Only pay 1 cattle per ritual good, regardless of price
   | Qamata Natural
@@ -377,7 +377,8 @@ instance Semigroup Player where
     , playerCattle = on (+) playerCattle p1 p2
     , playerMonuments = on (M.unionWith (+)) playerMonuments p1 p2
     , playerCraftsmen = on (<>) playerCraftsmen p1 p2
-    , playerTechnologyCards = on (M.unionWith (+)) playerTechnologyCards p1 p2
+    , playerTechnologyCards = on M.union playerTechnologyCards p1 p2
+    -- ^ New prices overwrite old ones.
     , playerSpecialists = on (M.unionWith (+)) playerSpecialists p1 p2
     , playerGod = on (<|>) playerGod p1 p2
     , playerActivations = playerActivations p2

@@ -48,10 +48,24 @@ chooseGod god playerId game = PlayerAction $ do
   -- NB. destructive
   let withoutGod = game & gods %~ S.delete god
 
+  issueRefundIfGu <- if god == Gu
+    then refundTechnologyCards playerId game
+    else pure mempty
+
   pure
     $  withoutGod
     <> setPlayer playerId (mempty { playerGod = Just god })
-    <> addVictoryRequirement (godVR god) playerId mempty
+    <> issueRefundIfGu
+
+refundTechnologyCards :: PlayerId -> Game -> Either GameError Game
+refundTechnologyCards playerId game = do
+  player <- getPlayer playerId game
+  let currentTechnologyCards = M.keys (player ^. technologyCards)
+      totalVR = fromIntegral . sum $ map technologyCardVictoryRequirement
+                                         currentTechnologyCards
+      refundedVR = totalVR
+
+  pure $ addVictoryRequirement refundedVR playerId game
 
 chooseSpecialist
   :: Specialist -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
@@ -243,6 +257,21 @@ executeIfEmpty message location playerId game executeAction = do
                     <> " has already built a monument too close to this location!"
                 Nothing -> executeAction
 
+buildMonuments
+  :: [Location] -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
+buildMonuments locations playerId game = PlayerAction $ do
+  player <- getPlayer playerId game
+  (player ^. god /= Just Obatala)
+    `impliesInvalid` "Only the player adoring Obatala can perform this action."
+  (null locations) `impliesInvalid` "You must build at least one monument."
+  (length locations > 2)
+    `impliesInvalid` "You cannot build more than two monuments."
+
+  foldM
+    (\game0 location -> getPlayerAction (buildMonument location playerId game0))
+    game
+    locations
+
 buildMonument
   :: Location -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 buildMonument location playerId game = PlayerAction $ do
@@ -262,9 +291,8 @@ data Located
 
 -- TODO: Technically there can be multiples here, but I don't really care yet?
 playerMonumentAround :: Location -> Game -> Maybe (Player, Natural)
-playerMonumentAround location game = asum
-  $ map (`lookupMonument` game) (locationNeighbors8 location)
- where
+playerMonumentAround location game =
+  asum $ map (`lookupMonument` game) (locationNeighbors8 location)
 
 locatedAt :: Location -> Game -> Maybe Located
 locatedAt location game =
@@ -329,14 +357,17 @@ lookupCraftsman location game = asum
         guard (rotatedDimensions craftsman == dimension)
         pure (player, craftsman)
 
--- TODO: Craftsmen are limited (add them to the supply)
 placeCraftsmen
   :: [(Location, Rotated Craftsman)]
   -- ^ Note: This can be empty just to trigger a 'raisePrices' command.
   -> PlayerId
   -> Game
   -> PlayerAction 'ReligionAndCulture
-placeCraftsmen placements playerId game0 = PlayerAction $ go placements game0
+placeCraftsmen placements playerId game0 = PlayerAction $ do
+  playerIs playerId game0
+  phaseIs ReligionAndCulture game0
+
+  go placements game0
  where
   go :: [(Location, Rotated Craftsman)] -> Game -> Either GameError Game
   go []                              game1 = pure game1
@@ -344,6 +375,7 @@ placeCraftsmen placements playerId game0 = PlayerAction $ go placements game0
     game2 <- placeCraftsman location rCraftsman playerId game1
     go rest game2
 
+-- TODO: Craftsmen are limited (add them to the supply)
 placeCraftsman
   :: Location -> Rotated Craftsman -> PlayerId -> Game -> Either GameError Game
 placeCraftsman location rCraftsman playerId game = do
@@ -351,6 +383,13 @@ placeCraftsman location rCraftsman playerId game = do
       craftsmanLocations = coveredLocations location rCraftsman
       isEmpty loc =
         executeIfEmpty "Cannot place craftsman" loc playerId game (pure ())
+
+  case M.lookup craftsman (game ^. craftsmanTiles) of
+    Nothing ->
+      internalError $ "Missing craftsman tile for type: " <> tshow craftsman
+    Just n ->
+      (n <= 0)
+        `impliesInvalid` "There are no craftsman tiles of this type left."
 
   playerHasCard <- playerHasCardOfType craftsman playerId game
   newGame       <- if playerHasCard
@@ -412,12 +451,11 @@ placeCraftsman location rCraftsman playerId game = do
   let updates =
         [ setPlayer playerId
                     (mempty & craftsmen .~ M.singleton location rCraftsman)
+        , mempty & craftsmanTiles .~ M.singleton craftsman (-1)
         ]
 
   -- Initially set the price of the craftsman to 1.
   -- Players can raise prices if they want using the 'raise-prices' command
-
-  -- TODO: Add raise-prices command which is only valid after place-craftsmen
   pure $ newGame <> mconcat updates
 
 reachableLocationsUsingOneHub
@@ -466,17 +504,17 @@ takeCheapestTechnologyCard craftsman playerId game = do
       player <- getPlayer playerId game
       playerHasCattle (technologyCardCost card) playerId game
 
-      let
-        updates =
-          [ subtractCattle (fromIntegral $ technologyCardCost card) playerId
-          , addVictoryPoints (fromIntegral $ technologyCardVictoryPoints card)
-                             playerId
-                             game
-          , addVictoryRequirement
-            (fromIntegral $ technologyCardVictoryRequirement card)
-            playerId
-            game
-          ]
+      let cardVR = if player ^. god == Just Gu
+            then 1
+            else fromIntegral (technologyCardVictoryRequirement card)
+          updates =
+            [ subtractCattle (fromIntegral $ technologyCardCost card) playerId
+            , addVictoryPoints
+              (fromIntegral $ technologyCardVictoryPoints card)
+              playerId
+              game
+            , addVictoryRequirement cardVR playerId game
+            ]
 
       -- NB. This insert looks problematic, but 'cards' is the _rest_ of the
       -- cards after popping the first element, so we're actually deleting
@@ -519,16 +557,71 @@ raiseMonuments = undefined
   useResource           = undefined
   useSecondaryCraftsman = undefined
 
--- Set the price of a technology card. Mandatory after choosing a new card.
-setPrice
-  :: TechnologyCard -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
-setPrice = undefined
+-- Raise the price of a technology card. Only possible after placing craftsmen.
+raisePrice :: Craftsman -> Int -> PlayerId -> Game -> Either GameError Game
+raisePrice craftsman newPrice playerId game = do
+  (newPrice > 3 || newPrice < 1)
+    `impliesInvalid` "Price must be between 1 and 3."
 
--- Raise prices of a Player's technology cards. Available after taking the
--- placeCraftsmen action.
+  player <- getPlayer playerId game
+
+  let availableTechnologyCards = M.toList (player ^. technologyCards)
+      mTechnologyCard          = find
+        ((== craftsman) . technologyCardCraftsmanType . fst)
+        availableTechnologyCards
+
+  case mTechnologyCard of
+    Nothing -> invalidAction $ mconcat
+      [ "Cannot raise price of a "
+      , tshow craftsman
+      , ": you do not have the necessary Technology Card."
+      ]
+
+    Just (card, cardPrice) -> do
+      (cardPrice <= fromIntegral newPrice)
+        `impliesInvalid` "Price must increase."
+      pure $ game <> setPlayer
+        playerId
+        (mempty & technologyCards .~ M.singleton card (fromIntegral newPrice))
+
+setPrices
+  :: [(Int, Craftsman)] -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
+setPrices prices playerId game = PlayerAction $ foldM
+  (\game0 (price, craftsman) -> setPrice craftsman price playerId game0)
+  game
+  prices
+
 raisePrices
-  :: [(TechnologyCard, Natural)]
-  -> PlayerId
-  -> Game
-  -> PlayerAction 'ReligionAndCulture
-raisePrices = undefined
+  :: [(Int, Craftsman)] -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
+raisePrices prices playerId game = PlayerAction $ foldM
+  (\game0 (price, craftsman) -> raisePrice craftsman price playerId game0)
+  game
+  prices
+
+-- Raise the price of a technology card. Only possible at beginning of turn
+-- as Dziva.
+setPrice :: Craftsman -> Int -> PlayerId -> Game -> Either GameError Game
+setPrice craftsman newPrice playerId game = do
+  (newPrice > 3 || newPrice < 1)
+    `impliesInvalid` "Price must be between 1 and 3."
+
+  player <- getPlayer playerId game
+  (playerGod player /= Just Dziva)
+    `impliesInvalid` "You must adore Dziva to perform the set-price action."
+
+  let availableTechnologyCards = M.toList (player ^. technologyCards)
+      mTechnologyCard          = find
+        ((== craftsman) . technologyCardCraftsmanType . fst)
+        availableTechnologyCards
+
+  case mTechnologyCard of
+    Nothing -> invalidAction $ mconcat
+      [ "Cannot raise price of a "
+      , tshow craftsman
+      , ": you do not have the necessary Technology Card."
+      ]
+
+    Just (card, cardPrice) -> do
+      pure $ game <> setPlayer
+        playerId
+        (mempty & technologyCards .~ M.singleton card (fromIntegral newPrice))

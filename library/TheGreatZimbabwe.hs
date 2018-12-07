@@ -44,11 +44,18 @@ runGameCommand game playerId = \case
   Pass       -> handleFinishGenerosityOfKings (pass playerId game)
   ReligionAndCultureCommand ReligionAndCultureMultiCommand {..} -> do
     game0 <-
+      fmap (fromMaybe game)
+      $ for religionAndCultureMultiCommandDziva
+      $ \prices -> getPlayerAction
+          $ setPrices (map (\(SetPrice a b) -> (a, b)) prices) playerId game
+
+    game1 <-
       fmap (fromMaybe game) $ for religionAndCultureMultiCommandAction1 $ \case
         ChooseGod god -> getPlayerAction $ chooseGod god playerId game
         ChooseSpecialist specialist ->
           getPlayerAction $ chooseSpecialist specialist playerId game
-    game1 <-
+
+    game2 <-
       fmap (fromMaybe game0) $ for religionAndCultureMultiCommandAction2 $ \case
         UseShaman resource location ->
           getPlayerAction $ useShaman resource location playerId game0
@@ -57,7 +64,8 @@ runGameCommand game playerId = \case
         UseHerd n  -> getPlayerAction $ useHerd n playerId game0
         UseBuilder -> getPlayerAction $ useBuilder playerId game0
         UseNomads  -> getPlayerAction $ useNomads playerId game0
-    game2 <-
+
+    game3 <-
       fmap (fromMaybe game1) $ for religionAndCultureMultiCommandAction3 $ \case
         BuildMonuments (location :| []) ->
           getPlayerAction $ buildMonument location playerId game

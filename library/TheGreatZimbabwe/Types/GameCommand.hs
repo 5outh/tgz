@@ -28,16 +28,26 @@ data UseSpecialist
 
 deriveBoth defaultOptions ''UseSpecialist
 
+data SetPrice = SetPrice
+  { setPricePrice     :: Int
+  , setPriceCraftsman :: Craftsman
+  } deriving (Show)
+
+deriveBoth (unPrefix "setPrice") ''SetPrice
+
 data ReligionAndCultureCommand3
   = BuildMonuments (NonEmpty Location)
-  | PlaceCraftsmen [(Location, Rotated Craftsman)]
+  | PlaceCraftsmen [(Location, Rotated Craftsman)] [SetPrice]
   | RaiseMonuments [(Location, [RaiseMonumentCommand])]
   deriving (Show)
 
 deriveBoth defaultOptions ''ReligionAndCultureCommand3
 
 data ReligionAndCultureMultiCommand = ReligionAndCultureMultiCommand
-  { religionAndCultureMultiCommandAction1 :: Maybe ReligionAndCultureCommand1
+  { religionAndCultureMultiCommandDziva   :: Maybe [SetPrice]
+  -- ^ Dziva can raise or lower prices at the beginning of their turn. If this
+  -- is set and player is *not* Dziva, that is invalid
+  , religionAndCultureMultiCommandAction1 :: Maybe ReligionAndCultureCommand1
   , religionAndCultureMultiCommandAction2 :: Maybe UseSpecialist
   , religionAndCultureMultiCommandAction3 :: Maybe ReligionAndCultureCommand3
   , religionAndCultureMultiCommandEnd     :: Bool
