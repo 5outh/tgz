@@ -47,3 +47,11 @@ playerHasSpecialist specialist playerId game = do
  where
   doesn'tHaveSpecialist =
     "You don't have that Specialist (" <> tshow specialist <> ")."
+
+playerHasGod :: God -> PlayerId -> Game -> Either GameError ()
+playerHasGod god' playerId game = do
+  player <- getPlayer playerId game
+  (player ^. god /= Just god') `impliesInvalid` doesn'tHaveGod
+ where
+  doesn'tHaveGod =
+    "You must adore " <> tshow god' <> " for that action to work."

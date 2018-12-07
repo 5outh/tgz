@@ -1,8 +1,12 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE LambdaCase             #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE RecordWildCards        #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TupleSections          #-}
 module TheGreatZimbabwe.ReligionAndCulture where
 
 import           Control.Applicative
@@ -303,7 +307,8 @@ locatedAt location game =
       mCraftsman = lookupCraftsman location game
   in  asum
         [ uncurry LocatedPlayerMonument <$> mMonument
-        , uncurry LocatedPlayerCraftsman <$> mCraftsman
+        , uncurry LocatedPlayerCraftsman
+          <$> (fmap (\(a, b, c) -> (b, c)) mCraftsman)
         , LocatedSquare <$> mSquare
         ]
 
@@ -330,7 +335,8 @@ lookupMonument location game =
 -- TODO: This implementation is really inefficient; we could cache the craftsman
 -- at all four locations. But whatever for now.
 --
-lookupCraftsman :: Location -> Game -> Maybe (Player, Rotated Craftsman)
+lookupCraftsman
+  :: Location -> Game -> Maybe (Location, Player, Rotated Craftsman)
 lookupCraftsman location game = asum
   (  map (lookupPlayerCraftsman location Nothing)   players'
   <> map (lookupPlayerCraftsman left (Just (2, 2))) players'
@@ -348,14 +354,14 @@ lookupCraftsman location game = asum
     :: Location
     -> Maybe (Natural, Natural)
     -> Player
-    -> Maybe (Player, Rotated Craftsman)
+    -> Maybe (Location, Player, Rotated Craftsman)
   lookupPlayerCraftsman loc mDimension player@(Player {..}) = do
     craftsman <- M.lookup loc playerCraftsmen
     case mDimension of
-      Nothing        -> pure (player, craftsman)
+      Nothing        -> pure (loc, player, craftsman)
       Just dimension -> do
         guard (rotatedDimensions craftsman == dimension)
-        pure (player, craftsman)
+        pure (loc, player, craftsman)
 
 placeCraftsmen
   :: [(Location, Rotated Craftsman)]
@@ -530,33 +536,6 @@ playerHasCardOfType craftsman playerId game = do
     (\playerCard -> technologyCardCraftsmanType playerCard == craftsman)
     (M.keys $ player ^. technologyCards)
 
-data RaiseMonumentCommand
-  = UseHub Location
-  -- ^ Use a hub at some location, utilizing the resource at another location
-  | UseCraftsman Location Location
-  -- ^ Use a craftsman at some location, utilizing the resource at another location
-  deriving (Show)
-
-deriveBoth defaultOptions ''RaiseMonumentCommand
-
--- TODO: This can affect the game state in a variety of ways. need some sequence
--- of commands from the player to execute this action. This is the heft of the
--- game logic.
-raiseMonuments
-  :: [(Location, [RaiseMonumentCommand])]
-  -- ^ For each location user wants to raise, a sequence of commands done in
-  -- order to raise it.
-  -> PlayerId
-  -> Game
-  -> PlayerAction 'ReligionAndCulture
-raiseMonuments = undefined
- where
-  -- NB. This is just for reference; all should be contained in
-  -- 'RaiseMonumentCommand'
-  obtainRitualGoods     = undefined
-  useResource           = undefined
-  useSecondaryCraftsman = undefined
-
 -- Raise the price of a technology card. Only possible after placing craftsmen.
 raisePrice :: Craftsman -> Int -> PlayerId -> Game -> Either GameError Game
 raisePrice craftsman newPrice playerId game = do
@@ -586,17 +565,24 @@ raisePrice craftsman newPrice playerId game = do
 
 setPrices
   :: [(Int, Craftsman)] -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
-setPrices prices playerId game = PlayerAction $ foldM
-  (\game0 (price, craftsman) -> setPrice craftsman price playerId game0)
-  game
-  prices
+setPrices prices playerId game = PlayerAction $ do
+  playerIs playerId game
+  phaseIs ReligionAndCulture game
+
+  foldM (\game0 (price, craftsman) -> setPrice craftsman price playerId game0)
+        game
+        prices
 
 raisePrices
   :: [(Int, Craftsman)] -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
-raisePrices prices playerId game = PlayerAction $ foldM
-  (\game0 (price, craftsman) -> raisePrice craftsman price playerId game0)
-  game
-  prices
+raisePrices prices playerId game = PlayerAction $ do
+  playerIs playerId game
+  phaseIs ReligionAndCulture game
+
+  foldM
+    (\game0 (price, craftsman) -> raisePrice craftsman price playerId game0)
+    game
+    prices
 
 -- Raise the price of a technology card. Only possible at beginning of turn
 -- as Dziva.
@@ -625,3 +611,136 @@ setPrice craftsman newPrice playerId game = do
       pure $ game <> setPlayer
         playerId
         (mempty & technologyCards .~ M.singleton card (fromIntegral newPrice))
+
+data RaiseMonumentCommand
+  = UseHub Location
+  -- ^ Use a hub at some location, utilizing the resource at another location
+  | UseCraftsman Location Location
+  -- ^ Use a craftsman at some location, utilizing the resource at another location
+  deriving (Show)
+
+deriveBoth defaultOptions ''RaiseMonumentCommand
+
+-- TODO: This can affect the game state in a variety of ways. need some sequence
+-- of commands from the player to execute this action. This is the heft of the
+-- game logic.
+--
+-- TODO: I would like to be able to return an incomplete preview here.
+raiseMonuments
+  :: [(Location, [RaiseMonumentCommand])]
+  -- ^ For each location user wants to raise, a sequence of commands done in
+  -- order to raise it.
+  -> PlayerId
+  -> Game
+  -> PlayerAction 'ReligionAndCulture
+raiseMonuments commands playerId game = undefined
+ where
+  -- NB. This is just for reference; all should be contained in
+  -- 'RaiseMonumentCommand'
+  obtainRitualGoods     = undefined
+  useResource           = undefined
+  useSecondaryCraftsman = undefined
+  mapGraph              = constructMapGraph (game ^. mapLayout)
+
+data RaiseMonumentState = RaiseMonumentState
+  { raiseMonumentStateCurrentLocation :: Location
+  -- ^ The player's "current location"
+  , raiseMonumentStateRitualGoodHeld  :: Maybe Craftsman
+  -- ^ You either have nothing yet, or a ritual good from a craftsman (primary or secondary).
+  , raiseMonumentStateCraftsmenUsed   :: S.Set Resource
+  -- ^ Track the types of Resource already used *to raise a monument* this turn.
+  -- NB. the bolded statement is important because you can use resources to pay
+  -- primary craftsmen on the way to a secondary. that doesn't count against you
+  -- here.
+  }
+
+makeLensesWith camelCaseFields 'RaiseMonumentState
+
+-- Assumption: Everything up until this point has been validated. We don't need
+-- to trace steps back to make sure we're raising a valid monument.
+--
+-- Note the state is used for stuff that can conflict *this turn*. Global
+-- modifications to the game are still made as needed.
+--
+-- This should return a list of remaining commands when monument has been raised.
+-- If it  results in an incomplete turn, it returns Nothing (or, the state?).
+--
+raiseMonument1 playerId mapGraph state@(RaiseMonumentState {..}) game = \case
+  -- using a craftsman can trigger a location reset, i.e. end this.
+  (UseCraftsman craftsmanLocation resourceLocation : commands) -> do
+    player <- getPlayer playerId game
+    let transportationRange = if player ^. god == Just Eshu then 6 else 3
+        -- TODO: do we kick off from the location the user chose, or allow
+        -- branching off from all covered locations? former is easier.
+        --
+        -- The craftsman we're trying to use - one of the covered locations must
+        -- be within range.
+        mCraftsmanInUse     = lookupCraftsman craftsmanLocation game
+
+    case mCraftsmanInUse of
+      Nothing -> invalidAction
+        (  "There is no craftsman at location "
+        <> pprintLocation craftsmanLocation
+        <> "."
+        )
+      Just (hookLocation, owner, rotatedCraftsman) -> do
+        let craftsmanLocations =
+              S.fromList $ coveredLocations hookLocation rotatedCraftsman
+            reachableFromCraftsman =
+              mapConnectionsN transportationRange mapGraph (craftsmanLocations)
+            theCraftsman = getRotated rotatedCraftsman
+
+        -- can the player reach the craftsman?
+
+        (raiseMonumentStateCurrentLocation `S.notMember` reachableFromCraftsman)
+          `impliesInvalid` (  "You cannot reach the craftsman at "
+                           <> pprintLocation craftsmanLocation
+                           <> "."
+                           )
+
+        -- can the player reach the required resource, starting at the craftsman?
+
+        (resourceLocation `S.notMember` reachableFromCraftsman)
+          `impliesInvalid` (  "You cannot reach the required resource at "
+                           <> pprintLocation resourceLocation
+                           <> " (starting from the "
+                           <> tshow theCraftsman
+                           <> ")."
+                           )
+
+        -- can the player validly use this craftsman this turn (have they used before, and are not tsui-goab?)
+
+        -- does the player have enough money to pay for the ritual good?
+
+        -- has the resource already been used (a used marker is there, and not Atete/used twice?)?
+
+        -- if all are fine, add a used marker to resource and update state
+
+        -- is it finished:
+        --  - primary craftsman => secondary does not exist on board yet
+        --  - secondary craftsman => holding primary ritual good
+
+        undefined
+
+
+    undefined
+
+  (UseHub hubLocation : commands) -> do
+    player <- getPlayer playerId game
+    playerHasCattle 1 playerId game
+
+    let transportationRange = if player ^. god == Just Eshu then 6 else 3
+        reachable           = mapConnectionsN
+          transportationRange
+          mapGraph
+          (S.singleton raiseMonumentStateCurrentLocation)
+
+    (hubLocation `S.notMember` reachable)
+      `impliesInvalid` "You are not within range of that hub."
+
+    let newGame  = game <> subtractCattle 1 playerId
+        newState = state & currentLocation .~ hubLocation
+
+    raiseMonument1 playerId mapGraph newState newGame commands
+
+  [] -> pure undefined -- ???
