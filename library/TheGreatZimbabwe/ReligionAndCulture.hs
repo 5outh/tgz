@@ -661,15 +661,57 @@ instance Semigroup RaiseMonumentState where
 instance Monoid RaiseMonumentState where
   mempty = RaiseMonumentState Nothing Nothing S.empty
 
--- Assumption: Everything up until this point has been validated. We don't need
--- to trace steps back to make sure we're raising a valid monument.
---
--- Note the state is used for stuff that can conflict *this turn*. Global
--- modifications to the game are still made as needed.
---
--- This should return a list of remaining commands when monument has been raised.
--- If it  results in an incomplete turn, it returns Nothing (or, the state?).
---
+raiseMonumentForLocation location playerId mapGraph game commands = do
+  player <- getPlayer playerId game
+  let mMonumentHeight = M.lookup location (playerMonuments player)
+  case mMonumentHeight of
+    Nothing ->
+      invalidAction
+        $  "You must build a monument at "
+        <> pprintLocation location
+        <> " before raising it."
+    Just currentHeight -> do
+      let desiredHeight = (fromIntegral currentHeight + 1)
+      -- If this completes, it worked.
+      (game0, commands0) <- go desiredHeight game commands
+
+      let heightVP = \case
+            1 -> 1
+            2 -> 2
+            3 -> 4
+            4 -> 6
+            5 -> 8
+          updates =
+            [ setPlayer playerId (mempty & monuments .~ M.singleton location 1)
+            , addVictoryPoints (heightVP desiredHeight) playerId game0
+            ]
+
+      -- if there are additional commands, just do it again
+      case commands0 of
+        []                -> pure (game0 <> mconcat updates)
+        remainingCommands -> raiseMonumentForLocation location
+                                                      playerId
+                                                      mapGraph
+                                                      game0
+                                                      remainingCommands
+ where
+  -- nb. there is a case where we raise a monument more than once, so retain the remaining commands
+  go
+    :: Int
+    -> Game
+    -> [RaiseMonumentCommand]
+    -> Either GameError (Game, [RaiseMonumentCommand])
+  go 0      game0 commands0 = pure (game0, commands0)
+  go height game0 commands0 = do
+    (game1, additionalCommands) <- raiseMonument1
+      playerId
+      mapGraph
+      (mempty { raiseMonumentStateCurrentLocation = Just location })
+      game0
+      commands0
+    go (height - 1) game1 commands
+
+-- Fetch one level of ritual goods.
 raiseMonument1 playerId mapGraph state@(RaiseMonumentState {..}) game = \case
   -- using a craftsman can trigger a location reset, i.e. end this.
   (UseCraftsman craftsmanLocation resourceLocation : commands) -> do
@@ -791,10 +833,8 @@ raiseMonument1 playerId mapGraph state@(RaiseMonumentState {..}) game = \case
            )
         then
           case commands of
-            [] -> pure (game <> mconcat gameUpdates, commands)
-            _ ->
-              invalidAction
-                "There are additional commands after obtaining and delivering ritual goods."
+            [] -> pure (game <> mconcat gameUpdates, [])
+            _  -> pure (game <> mconcat gameUpdates, commands)
         else
           do
             -- if this *is* the secondary craftsman, validate that the primary
@@ -830,13 +870,40 @@ raiseMonument1 playerId mapGraph state@(RaiseMonumentState {..}) game = \case
     (hubLocation `S.notMember` reachable)
       `impliesInvalid` "You are not within range of that hub."
 
-    let newGame = game <> subtractCattle 1 playerId
+    payHub <- payForHub playerId game
+
+    let newGame = game <> payHub
         newState =
           state { raiseMonumentStateCurrentLocation = Just hubLocation }
 
     raiseMonument1 playerId mapGraph newState newGame commands
 
-  [] -> pure undefined -- ???
+  [] -> invalidAction "Ran out of commands without raising a monument."
+
+-- pay qamata for hub instead of common stock if she exists
+payForHub :: PlayerId -> Game -> Either GameError Game
+payForHub playerId game = do
+  players <- getPlayers game
+  let mPlayerWithQamata = find
+        (\p -> case playerGod p of
+          Just (Qamata _) -> True
+          _               -> False
+        )
+        players
+  case mPlayerWithQamata of
+    Nothing -> pure $ subtractCattle 1 playerId
+    Just player ->
+      let
+        -- this is safe, from above
+          Just (Qamata qamataCattle) = playerGod player
+      in  case playerInfo player of
+            Nothing -> internalError "Cannot find playerId for player"
+            Just PlayerInfo {..} -> pure $ mconcat
+              [ setPlayer playerId $ mempty & god .~ Just
+                (Qamata (succ qamataCattle))
+              , subtractCattle 1 playerId
+              ]
+
 
 -- | Returns true if the secondary craftsman exists for the given craftsman
 --
@@ -850,11 +917,6 @@ secondaryCraftsmanExists craftsman game = do
       findCraftsmanLocations associatedCraftsman game
   pure $ S.null (fromMaybe S.empty mLocations)
 
--- TODO: This can affect the game state in a variety of ways. need some sequence
--- of commands from the player to execute this action. This is the heft of the
--- game logic.
---
--- TODO: I would like to be able to return an incomplete preview here.
 raiseMonuments
   :: [(Location, [RaiseMonumentCommand])]
   -- ^ For each location user wants to raise, a sequence of commands done in
@@ -863,15 +925,19 @@ raiseMonuments
   -> Game
   -> PlayerAction 'ReligionAndCulture
 raiseMonuments raiseMonumentCommands playerId game = PlayerAction $ do
+  player <- getPlayer playerId game
+
+  let monumentHeightAt location = M.lookup location (player ^. monuments)
+      commandCounts   = map (over _2 (const 1)) raiseMonumentCommands
+      commandCountMap = M.fromListWith (+) commandCounts
+
   foldM
     (\game0 (location, commands) ->
-      fst <$> raiseMonument1 playerId mapGraph (mkState location) game0 commands
+      raiseMonumentForLocation location playerId mapGraph game0 commands
     )
     game
     raiseMonumentCommands
  where
-  -- NB. This is just for reference; all should be contained in
-  -- 'RaiseMonumentCommand'
   mkState location =
     mempty { raiseMonumentStateCurrentLocation = Just location }
   mapGraph = constructMapGraph (game ^. mapLayout)

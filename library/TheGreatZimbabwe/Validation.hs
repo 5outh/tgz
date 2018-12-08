@@ -14,7 +14,6 @@ import           TheGreatZimbabwe.Game
 import           TheGreatZimbabwe.Text
 import           TheGreatZimbabwe.Types
 
-
 phaseIs :: Phase -> Game -> Either GameError ()
 phaseIs phase game =
   (currentPhase' /= Just phase)
@@ -55,3 +54,21 @@ playerHasGod god' playerId game = do
  where
   doesn'tHaveGod =
     "You must adore " <> tshow god' <> " for that action to work."
+
+-- TODO: This probably belongs elsewhere.
+
+runPlayerAction
+  :: Phase
+  -> PlayerId
+  -> Game
+  -> (PlayerId -> Game -> PlayerAction actionPhase)
+  -> Either GameError Game
+runPlayerAction phase playerId game act = do
+  phaseIs phase game
+  playerIs playerId game
+  getPlayerAction (act playerId game)
+
+preSetupAction = runPlayerAction PreSetup
+setupAction = runPlayerAction Setup
+generosityOfKingsAction = runPlayerAction GenerosityOfKings
+religionAndCultureAction = runPlayerAction ReligionAndCulture

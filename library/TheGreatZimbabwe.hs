@@ -46,31 +46,42 @@ runGameCommand game playerId = \case
     game0 <-
       fmap (fromMaybe game)
       $ for religionAndCultureMultiCommandDziva
-      $ \prices -> getPlayerAction
-          $ setPrices (map (\(SetPrice a b) -> (a, b)) prices) playerId game
+      $ \prices -> religionAndCultureAction playerId game
+          $ setPrices (map (\(SetPrice a b) -> (a, b)) prices)
 
     game1 <-
-      fmap (fromMaybe game) $ for religionAndCultureMultiCommandAction1 $ \case
-        ChooseGod god -> getPlayerAction $ chooseGod god playerId game
+      fmap (fromMaybe game0) $ for religionAndCultureMultiCommandAction1 $ \case
+        ChooseGod god -> religionAndCultureAction playerId game (chooseGod god)
         ChooseSpecialist specialist ->
-          getPlayerAction $ chooseSpecialist specialist playerId game
+          religionAndCultureAction playerId game (chooseSpecialist specialist)
 
     game2 <-
-      fmap (fromMaybe game0) $ for religionAndCultureMultiCommandAction2 $ \case
-        UseShaman resource location ->
-          getPlayerAction $ useShaman resource location playerId game0
-        UseRainCeremony l1 l2 ->
-          getPlayerAction $ useRainCeremony l1 l2 playerId game0
-        UseHerd n  -> getPlayerAction $ useHerd n playerId game0
-        UseBuilder -> getPlayerAction $ useBuilder playerId game0
-        UseNomads  -> getPlayerAction $ useNomads playerId game0
+      fmap (fromMaybe game1)
+      $ for religionAndCultureMultiCommandAction2
+      $ \action -> religionAndCultureAction playerId game0 $ case action of
+          UseShaman       resource location -> useShaman resource location
+          UseRainCeremony l1       l2       -> useRainCeremony l1 l2
+          UseHerd n                         -> useHerd n
+          UseBuilder                        -> useBuilder
+          UseNomads                         -> useNomads
 
     game3 <-
-      fmap (fromMaybe game1) $ for religionAndCultureMultiCommandAction3 $ \case
+      fmap (fromMaybe game2) $ for religionAndCultureMultiCommandAction3 $ \case
         BuildMonuments (location :| []) ->
-          getPlayerAction $ buildMonument location playerId game
-        BuildMonuments (location :| (x : _)) -> error "unimplemented"
-        _ -> error "unimplemented"
+          religionAndCultureAction playerId game2 $ buildMonument location
+        BuildMonuments (location :| (x : _)) ->
+          religionAndCultureAction playerId game2 $ buildMonuments [location, x]
+        PlaceCraftsmen placements prices -> do
+          game0 <- religionAndCultureAction playerId game2
+            $ placeCraftsmen placements
+          religionAndCultureAction playerId game2
+            $ setPrices
+                (map (\SetPrice {..} -> (setPricePrice, setPriceCraftsman))
+                     prices
+                )
+        RaiseMonuments commands ->
+          religionAndCultureAction playerId game2 $ raiseMonuments commands
+    -- TODO: Need 'handleFinishReligionAndCulture'
     if religionAndCultureMultiCommandEnd then cyclePlayers game2 else pure game2
 
 runGameCommands :: Game -> [(PlayerId, GameCommand)] -> Either GameError Game
@@ -250,6 +261,8 @@ plaquesWithCattle totalCattle plaques =
 bid :: Natural -> PlayerId -> Game -> PlayerAction 'GenerosityOfKings
 bid amount playerId game = PlayerAction $ do
   playerIs playerId game
+
+  -- TODO: Handle Elegua
 
   (game ^. round . currentPhase /= Just GenerosityOfKings)
     `impliesInvalid` "You can only take the bid action in the Generosity of Kings phase"
