@@ -53,6 +53,7 @@ import Parser
         , (|=)
         , Parser
         , Step(..)
+        , andThen
         , chompUntilEndOr
         , float
         , keyword
@@ -75,12 +76,13 @@ type ReligionAndCultureCommand1
 
 type ReligionAndCultureCommand3
     = BuildMonuments (List Location)
-    | PlaceCraftsmen (List ( Location, Rotated Craftsman ))
+    | PlaceCraftsmen (List ( Location, Rotated Craftsman )) (List SetPrice)
     | RaiseMonuments (List ( Location, List RaiseMonumentCommand ))
 
 
 type alias ReligionAndCultureMultiCommand =
-    { action1 : Maybe ReligionAndCultureCommand1
+    { dziva : Maybe (List SetPrice)
+    , action1 : Maybe ReligionAndCultureCommand1
     , action2 : Maybe UseSpecialist
     , action3 : Maybe ReligionAndCultureCommand3
     , end : Bool
@@ -189,10 +191,25 @@ parseReligionAndCultureCommand =
 parseReligionAndCultureMultiCommand : Parser ReligionAndCultureMultiCommand
 parseReligionAndCultureMultiCommand =
     succeed ReligionAndCultureMultiCommand
+        |= parseDziva
         |= parseReligionAndCultureCommand1
         |= parseUseSpecialist
         |= parseReligionAndCultureCommand3
         |= parseEnd
+
+
+parseDziva : Parser (Maybe (List SetPrice))
+parseDziva =
+    let
+        maybeToList list =
+            case list of
+                [] ->
+                    Nothing
+
+                list0 ->
+                    Just list0
+    in
+    Parser.map maybeToList parseSetPrice
 
 
 parseReligionAndCultureCommand1 : Parser (Maybe ReligionAndCultureCommand1)
@@ -282,6 +299,26 @@ parsePlaceCraftsmen =
     Parser.map listToMaybe (Parser.loop [] parsePlaceCraftsmanCommands)
 
 
+parseSetPrice : Parser (List SetPrice)
+parseSetPrice =
+    let
+        parseSetPrice1 revList =
+            oneOf
+                [ succeed (\price craftsman -> Loop (SetPrice price craftsman :: revList))
+                    |. keyword "set-price"
+                    |. spaces
+                    |= Parser.int
+                    |. spaces
+                    |= parseCraftsman
+                    |. spaces
+                    |. chompUntilEndOr "\n"
+                , succeed ()
+                    |> Parser.map (\_ -> Done (List.reverse revList))
+                ]
+    in
+    Parser.loop [] parseSetPrice1
+
+
 parsePlaceCraftsmanCommands :
     List ( Location, Rotated Craftsman )
     -> Parser (Step (List ( Location, Rotated Craftsman )) (List ( Location, Rotated Craftsman )))
@@ -349,9 +386,22 @@ parseReligionAndCultureCommand3 =
         -- , -- RaiseMonuments (List ( Location, List RaiseMonumentCommand ))
         -- NB. this will 'succeed Nothing' in the case of failure (I think) so maybe
         -- it should come last?
-        , Parser.map (\maybeList -> Maybe.map PlaceCraftsmen maybeList) parsePlaceCraftsmen
+        , parsePlaceCraftsmen
+            |> andThen parseSetPrices
         , succeed Nothing |. spaces
         ]
+
+
+parseSetPrices :
+    Maybe (List ( Location, Rotated Craftsman ))
+    -> Parser (Maybe ReligionAndCultureCommand3)
+parseSetPrices mPlacements =
+    case mPlacements of
+        Nothing ->
+            succeed Nothing
+
+        Just placements ->
+            Parser.map (\setPrices -> Just <| PlaceCraftsmen placements setPrices) parseSetPrice
 
 
 parseLocations : Parser (List Location)
@@ -403,16 +453,6 @@ encodeGameCommand val =
     encodeSumObjectWithSingleField keyval val
 
 
-encodeReligionAndCultureMultiCommand : ReligionAndCultureMultiCommand -> Value
-encodeReligionAndCultureMultiCommand val =
-    Encode.object
-        [ ( "action1", maybeEncode encodeReligionAndCultureCommand1 val.action1 )
-        , ( "action2", maybeEncode encodeUseSpecialist val.action2 )
-        , ( "action3", maybeEncode encodeReligionAndCultureCommand3 val.action3 )
-        , ( "end", Encode.bool val.end )
-        ]
-
-
 encodeReligionAndCultureCommand1 : ReligionAndCultureCommand1 -> Value
 encodeReligionAndCultureCommand1 val =
     let
@@ -458,9 +498,19 @@ encodeReligionAndCultureCommand3 val =
                 BuildMonuments v1 ->
                     ( "BuildMonuments", encodeValue (Encode.list encodeLocation v1) )
 
-                PlaceCraftsmen v0 ->
+                PlaceCraftsmen v1 v2 ->
                     ( "PlaceCraftsmen"
-                    , encodeValue (Encode.list (\( v1, v2 ) -> Encode.list identity [ encodeLocation v1, encodeRotated encodeCraftsman v2 ]) v0)
+                    , encodeValue
+                        (Encode.list identity
+                            [ Encode.list
+                                (\( v11, v21 ) ->
+                                    Encode.list identity
+                                        [ encodeLocation v11, encodeRotated encodeCraftsman v21 ]
+                                )
+                                v1
+                            , Encode.list encodeSetPrice v2
+                            ]
+                        )
                     )
 
                 RaiseMonuments v0 ->
@@ -481,3 +531,28 @@ encodeRaiseMonumentCommand val =
                     ( "UseCraftsman", encodeValue (Encode.list identity [ encodeLocation v1, encodeLocation v2 ]) )
     in
     encodeSumObjectWithSingleField keyval val
+
+
+encodeReligionAndCultureMultiCommand : ReligionAndCultureMultiCommand -> Value
+encodeReligionAndCultureMultiCommand val =
+    Encode.object
+        [ ( "dziva", maybeEncode (Encode.list encodeSetPrice) val.dziva )
+        , ( "action1", maybeEncode encodeReligionAndCultureCommand1 val.action1 )
+        , ( "action2", maybeEncode encodeUseSpecialist val.action2 )
+        , ( "action3", maybeEncode encodeReligionAndCultureCommand3 val.action3 )
+        , ( "end", Encode.bool val.end )
+        ]
+
+
+type alias SetPrice =
+    { price : Int
+    , craftsman : Craftsman
+    }
+
+
+encodeSetPrice : SetPrice -> Value
+encodeSetPrice val =
+    Encode.object
+        [ ( "price", Encode.int val.price )
+        , ( "craftsman", encodeCraftsman val.craftsman )
+        ]
