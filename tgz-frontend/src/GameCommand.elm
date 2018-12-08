@@ -31,7 +31,7 @@ module GameCommand exposing
 
 import ApiTypes
     exposing
-        ( Craftsman
+        ( Craftsman(..)
         , Empire(..)
         , God(..)
         , Location
@@ -52,6 +52,7 @@ import Parser
         ( (|.)
         , (|=)
         , Parser
+        , Step(..)
         , chompUntilEndOr
         , float
         , keyword
@@ -261,6 +262,73 @@ parseGod =
         ]
 
 
+
+-- PlaceCraftsmen (List ( Location, Rotated Craftsman ))
+-- place-craftsman a0 (rotated IvoryCarver)
+-- place-craftsman a0 IvoryCarver
+
+
+parsePlaceCraftsmen : Parser (Maybe (List ( Location, Rotated Craftsman )))
+parsePlaceCraftsmen =
+    let
+        listToMaybe list =
+            case list of
+                [] ->
+                    Nothing
+
+                theList ->
+                    Just theList
+    in
+    Parser.map listToMaybe (Parser.loop [] parsePlaceCraftsmanCommands)
+
+
+parsePlaceCraftsmanCommands :
+    List ( Location, Rotated Craftsman )
+    -> Parser (Step (List ( Location, Rotated Craftsman )) (List ( Location, Rotated Craftsman )))
+parsePlaceCraftsmanCommands revList =
+    oneOf
+        [ succeed (\location craftsman -> Loop (( location, craftsman ) :: revList))
+            |. keyword "place-craftsman"
+            |. spaces
+            |= parseLocation
+            |. spaces
+            |= parseRotatedCraftsman
+            |. chompUntilEndOr "\n"
+            |. spaces
+        , succeed ()
+            |> Parser.map (\_ -> Done (List.reverse revList))
+        ]
+
+
+parseRotatedCraftsman : Parser (Rotated Craftsman)
+parseRotatedCraftsman =
+    oneOf
+        [ succeed Rotated
+            |. symbol "("
+            |. spaces
+            |. keyword "rotated"
+            |. spaces
+            |= parseCraftsman
+            |. spaces
+            |. symbol ")"
+        , succeed UnRotated
+            |. spaces
+            |= parseCraftsman
+        ]
+
+
+parseCraftsman =
+    oneOf
+        [ succeed Potter |. keyword "potter"
+        , succeed IvoryCarver |. keyword "ivory-carver"
+        , succeed WoodCarver |. keyword "wood-carver"
+        , succeed DiamondCutter |. keyword "diamond-cutter"
+        , succeed VesselMaker |. keyword "vessel-maker"
+        , succeed ThroneMaker |. keyword "throne-maker"
+        , succeed Sculptor |. keyword "sculptor"
+        ]
+
+
 parseReligionAndCultureCommand3 : Parser (Maybe ReligionAndCultureCommand3)
 parseReligionAndCultureCommand3 =
     oneOf
@@ -279,6 +347,9 @@ parseReligionAndCultureCommand3 =
 
         -- , -- PlaceCraftsmen (List ( Location, Rotated Craftsman ))
         -- , -- RaiseMonuments (List ( Location, List RaiseMonumentCommand ))
+        -- NB. this will 'succeed Nothing' in the case of failure (I think) so maybe
+        -- it should come last?
+        , Parser.map (\maybeList -> Maybe.map PlaceCraftsmen maybeList) parsePlaceCraftsmen
         , succeed Nothing |. spaces
         ]
 
