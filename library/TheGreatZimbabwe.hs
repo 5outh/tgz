@@ -72,17 +72,18 @@ runGameCommand game playerId = \case
         BuildMonuments (location :| (x : _)) ->
           religionAndCultureAction playerId game2 $ buildMonuments [location, x]
         PlaceCraftsmen placements prices -> do
-          game0 <- religionAndCultureAction playerId game2
+          newGame <- religionAndCultureAction playerId game2
             $ placeCraftsmen placements
-          religionAndCultureAction playerId game2
-            $ setPrices
+          religionAndCultureAction playerId newGame
+            $ raisePrices
                 (map (\SetPrice {..} -> (setPricePrice, setPriceCraftsman))
                      prices
                 )
         RaiseMonuments commands ->
           religionAndCultureAction playerId game2 $ raiseMonuments commands
+
     -- TODO: Need 'handleFinishReligionAndCulture'
-    if religionAndCultureMultiCommandEnd then cyclePlayers game2 else pure game2
+    if religionAndCultureMultiCommandEnd then cyclePlayers game3 else pure game3
 
 runGameCommands :: Game -> [(PlayerId, GameCommand)] -> Either GameError Game
 runGameCommands game commands = foldl' go (Right game) commands

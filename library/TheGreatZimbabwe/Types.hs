@@ -232,7 +232,7 @@ makeLensesWith camelCaseFields ''TechnologyCardState
 
 instance Semigroup TechnologyCardState where
   a <> b = TechnologyCardState
-    { technologyCardStatePrice  = on (+) technologyCardStatePrice a b
+    { technologyCardStatePrice = technologyCardStatePrice b -- override
     , technologyCardStateCattle  = on (+) technologyCardStateCattle a b
     }
 

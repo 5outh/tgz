@@ -387,23 +387,23 @@ placeCraftsmen placements playerId game0 = PlayerAction $ do
 -- TODO: Craftsmen are limited (add them to the supply)
 placeCraftsman
   :: Location -> Rotated Craftsman -> PlayerId -> Game -> Either GameError Game
-placeCraftsman location rCraftsman playerId game = do
+placeCraftsman location rCraftsman playerId game0 = do
   let craftsman          = getRotated rCraftsman
       craftsmanLocations = coveredLocations location rCraftsman
       isEmpty loc =
-        executeIfEmpty "Cannot place craftsman" loc playerId game (pure ())
+        executeIfEmpty "Cannot place craftsman" loc playerId game0 (pure ())
 
-  case M.lookup craftsman (game ^. craftsmanTiles) of
+  case M.lookup craftsman (game0 ^. craftsmanTiles) of
     Nothing ->
       internalError $ "Missing craftsman tile for type: " <> tshow craftsman
     Just n ->
       (n <= 0)
         `impliesInvalid` "There are no craftsman tiles of this type left."
 
-  playerHasCard <- playerHasCardOfType craftsman playerId game
-  newGame       <- if playerHasCard
-    then pure game
-    else takeCheapestTechnologyCard craftsman playerId game
+  playerHasCard <- playerHasCardOfType craftsman playerId game0
+  game          <- if playerHasCard
+    then pure game0
+    else takeCheapestTechnologyCard craftsman playerId game0
 
   -- Validate that all four locations are empty
   traverse_ isEmpty craftsmanLocations
@@ -465,7 +465,7 @@ placeCraftsman location rCraftsman playerId game = do
 
   -- Initially set the price of the craftsman to 1.
   -- Players can raise prices if they want using the 'raise-prices' command
-  pure $ newGame <> mconcat updates
+  pure $ game <> (traceShowId $ mconcat updates)
 
 reachableLocationsUsingOneHub
   :: MapGraph -> S.Set Location -> Game -> Either GameError (S.Set Location)
@@ -523,6 +523,12 @@ takeCheapestTechnologyCard craftsman playerId game = do
               playerId
               game
             , addVictoryRequirement cardVR playerId game
+            , setPlayer
+              playerId
+              (mempty & technologyCards .~ M.singleton
+                card
+                (mempty { technologyCardStatePrice = 1 })
+              )
             ]
 
       -- NB. This insert looks problematic, but 'cards' is the _rest_ of the
@@ -611,7 +617,7 @@ raisePrice craftsman newPrice playerId game = do
       ]
 
     Just (card, TechnologyCardState {..}) -> do
-      (technologyCardStatePrice <= fromIntegral newPrice)
+      (fromIntegral newPrice <= technologyCardStatePrice)
         `impliesInvalid` "Price must increase."
       pure $ game <> setPlayer
         playerId
