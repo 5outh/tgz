@@ -25,8 +25,10 @@ getPlayers game = pure $ M.elems (game ^. players)
 cyclePlayersWithPasses :: Game -> Either GameError Game
 cyclePlayersWithPasses game = do
   player <- nextPlayer (game ^. round . currentPlayer)
-  let setCurrentPlayer =
-        mempty & round .~ mempty { roundCurrentPlayer = Just player }
+  let setCurrentPlayer = mempty & round .~ mempty
+        { roundCurrentPlayer = Just player
+        , roundStep          = 1
+        }
       stepRound = mempty { gameStep = 1 }
 
   (length gokPlayersPassed == length players')
@@ -54,8 +56,10 @@ cyclePlayersWithPasses game = do
 cyclePlayers :: Game -> Either GameError Game
 cyclePlayers game = do
   player <- nextPlayer
-  let setCurrentPlayer =
-        mempty & round .~ mempty { roundCurrentPlayer = Just player }
+  let setCurrentPlayer = mempty & round .~ mempty
+        { roundCurrentPlayer = Just player
+        , roundStep          = 1
+        }
       stepRound = mempty { gameStep = 1 }
   pure $ game <> setCurrentPlayer <> stepRound
  where

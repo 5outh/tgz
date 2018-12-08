@@ -501,6 +501,8 @@ data Round = Round
   -- ^ State used in the Generosity of kings phase
   , roundCurrentPhase           :: Maybe Phase
   -- Current phase of the round
+  , roundStep :: Int
+  -- ^ How many player-turns have passed since the start of the round
   } deriving (Generic, Show)
 
 instance Semigroup Round where
@@ -510,10 +512,11 @@ instance Semigroup Round where
     , roundUsedMarkers = on (M.unionWith (+)) roundUsedMarkers r1 r2
     , roundGenerosityOfKingsState = on (<>) roundGenerosityOfKingsState r1 r2
     , roundCurrentPhase = on appendLast roundCurrentPhase r1 r2
+    , roundStep = on (+) roundStep r1 r2
     }
 
 instance Monoid Round where
-  mempty = Round mempty Nothing mempty mempty Nothing
+  mempty = Round mempty Nothing mempty mempty Nothing 0
 
 deriveBoth (unPrefix "round") ''Round
 makeLensesWith camelCaseFields ''Round

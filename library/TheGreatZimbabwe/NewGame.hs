@@ -51,6 +51,7 @@ newGame playerList = GameEvent <$> do
               , generosityOfKingsStatePlayersPassed = []
               }
             , roundCurrentPhase           = Just PreSetup
+            , roundStep                   = 0
             }
           gameSpecialists     = allSpecialists
           gameTechnologyCards = newGameTechnologyCards

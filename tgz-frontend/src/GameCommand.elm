@@ -382,12 +382,12 @@ parseReligionAndCultureCommand3 =
             |. chompUntilEndOr "\n"
             |. spaces
 
-        -- , -- PlaceCraftsmen (List ( Location, Rotated Craftsman ))
-        -- , -- RaiseMonuments (List ( Location, List RaiseMonumentCommand ))
         -- NB. this will 'succeed Nothing' in the case of failure (I think) so maybe
         -- it should come last?
-        , parsePlaceCraftsmen
-            |> andThen parseSetPrices
+        , parsePlaceCraftsmen |> andThen parseSetPrices
+
+        -- TODO:
+        -- , -- RaiseMonuments (List ( Location, List RaiseMonumentCommand ))
         , succeed Nothing |. spaces
         ]
 

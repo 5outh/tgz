@@ -14,6 +14,7 @@ import           Prelude                             hiding (round)
 
 import           Control.Applicative
 import           Control.Lens
+import           Control.Monad
 import           Data.List
 import           Data.List.NonEmpty                  (NonEmpty (..))
 import qualified Data.Map.Strict                     as M
@@ -82,8 +83,87 @@ runGameCommand game playerId = \case
         RaiseMonuments commands ->
           religionAndCultureAction playerId game2 $ raiseMonuments commands
 
-    -- TODO: Need 'handleFinishReligionAndCulture'
-    if religionAndCultureMultiCommandEnd then cyclePlayers game3 else pure game3
+    handleFinishReligionAndCulture game3
+
+-- Do we have a winner? mark them and set current player = Nothing.
+-- otherwise, clear out round, set phase
+-- to generosity of kings, handle income, and start over.
+handleFinishReligionAndCulture :: Game -> Either GameError Game
+handleFinishReligionAndCulture game = do
+  let shouldFinishRound =
+        (traceShowId $ game ^. round . step)
+          >= (traceShowId $ length (game ^. players) - 1)
+
+  if not shouldFinishRound
+    then cyclePlayers game
+    else do
+      players <- getPlayers game
+      let mWinner = determineWinner players
+      case mWinner of
+        Just _  -> pure $ (game & winner .~ mWinner)
+        Nothing -> do
+          -- if nobody has won...
+          playerIds <- for players $ \player -> case playerInfo player of
+            Nothing              -> internalError "Player does not have an id"
+            Just PlayerInfo {..} -> pure playerInfoPlayerId
+          game0 <- foldM
+            (\game1 playerId -> getGameEvent (playerRevenues playerId game1))
+            game
+            playerIds
+          pure
+            . setupGenerosityOfKings
+            . resetTechnologyCards
+            . resetSpecialists
+            . resetGods
+            $ game0
+
+determineWinner players = do
+  let possibleWinners = filter
+        (\player ->
+          playerVictoryPoints player >= playerVictoryRequirement player
+        )
+        players
+
+  case possibleWinners of
+    []  -> Nothing
+    [p] -> case playerInfo p of
+      Nothing              -> Nothing
+      Just PlayerInfo {..} -> Just playerInfoPlayerId
+    manyPlayers -> Nothing -- TODO: ties
+
+resetTechnologyCards :: Game -> Game
+resetTechnologyCards =
+  over (players . traverse . technologyCards . traverse . cattle) (const 0)
+
+resetSpecialists :: Game -> Game
+resetSpecialists = over (players . traverse . specialists . traverse) (const 0)
+
+resetGods :: Game -> Game
+resetGods = over (players . traverse . god) $ \case
+  Just (Qamata _) -> Just (Qamata 0)
+  god0            -> god0
+
+playerRevenues :: PlayerId -> Game -> GameEvent 'Revenues
+playerRevenues playerId game = GameEvent $ do
+  player <- getPlayer playerId game
+  let
+    technologyCardRevenue =
+      sum
+        $  map (technologyCardStateCattle)
+        $  M.elems
+        $  player
+        ^. technologyCards
+    specialistRevenue = sum $ M.elems $ player ^. specialists
+    godRevenue        = case player ^. god of
+      Just (Qamata n) -> n
+      _               -> 0
+    updates =
+      [ addCattle
+          (technologyCardRevenue + specialistRevenue + fromIntegral godRevenue)
+          playerId
+      ]
+
+  pure $ game <> mconcat updates
 
 runGameCommands :: Game -> [(PlayerId, GameCommand)] -> Either GameError Game
 runGameCommands game commands = foldl' go (Right game) commands
@@ -114,7 +194,7 @@ handleFinishPreSetup (PlayerAction act) = do
   game <- act
   let players' = M.elems (game ^. players)
   cyclePlayers $ if (all isJust $ map playerEmpire players')
-    then game & round . currentPhase .~ Just Setup
+    then game & set (round . currentPhase) (Just Setup) . set (round . step) 0
     else game
 
 -- * Setup
@@ -165,9 +245,10 @@ playerWithShadipinyi game =
 
 setupGenerosityOfKings :: Game -> Game
 setupGenerosityOfKings game =
-  withPlayerOrder <> setPhase <> resetGenerosityOfKings
+  withPlayerOrder <> withCurrentPlayer <> setPhase <> resetGenerosityOfKings
  where
   setPhase           = mempty & round . currentPhase .~ Just GenerosityOfKings
+
   -- current order of players
   currentPlayerOrder = game ^. round . players
 
@@ -187,7 +268,12 @@ setupGenerosityOfKings game =
   resetGenerosityOfKings =
     mempty & round . generosityOfKingsState .~ generosityOfKingsState0
 
-  withPlayerOrder = game & round . players .~ map fst playersOrderedByVR
+  withPlayerOrder =
+    game & set (round . players) (map fst playersOrderedByVR) . set
+      (round . step)
+      0
+  firstPlayer       = head $ map fst playersOrderedByVR
+  withCurrentPlayer = mempty & round . currentPlayer .~ Just firstPlayer
 
 handleFinishGenerosityOfKings
   :: PlayerAction 'GenerosityOfKings -> Either GameError Game
@@ -217,7 +303,7 @@ endGenerosityOfKings game = do
   players' = game ^. players
   -- N.B. This is destructive
   withClearedGenerosityOfKings =
-    game & round . generosityOfKingsState .~ mempty
+    game & set (round . generosityOfKingsState) mempty . set (round . step) 0
 
   gok = game ^. round . generosityOfKingsState
   withReligionAndCulturePhase =
