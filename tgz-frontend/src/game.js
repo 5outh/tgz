@@ -1,3 +1,5 @@
+import {Rect} from './canvas';
+
 var canvas;
 var ctx;
 
@@ -166,10 +168,67 @@ export function overlayPlayerMonuments(monumentsAndEmpire) {
       ctx.fillText(locationText(location), centerX, centerY + size/4);
     }
   }
+
+  // Return an empty string for Elm runtime.
+  return "";
+}
+
+// TODO: need size
+export function overlayPlayerCraftsmen(playerCraftsmen) {
+  console.log({playerCraftsmen});
+
+  const craftsmen = playerCraftsmen.craftsmen;
+  const empire = playerCraftsmen.empire;
+
+  // either 12 or 18 squares
+  // TODO: need size from somewhere
+  let numSquares = 18
+  //if (craftsmen.length == 144) {
+    //numSquares = 12;
+  //}
+
+  const size = 720 / numSquares
+
+  for (var i = 0; i < craftsmen.length; i++) {
+    overlayPlayerCraftsman(size, empire, craftsmen[i]);
+  }
+}
+
+export function overlayPlayerCraftsman(size, empire, playerCraftsman) {
+  console.log("got");
+  console.log(playerCraftsman);
+
+  var ctx = getGameCanvasContext()
+  // TODO: Fix this
+
+  const textSize = size / 2.5
+  const smallTextSize = size / 3.5
+
+  const craftsman = playerCraftsman.craftsman;
+  const [x, y] = locationToCoordinates(size, playerCraftsman.location);
+  const {width, height} = playerCraftsman.dimensions;
+  const [primary, secondary] = craftsmanColors(craftsman);
+  const rect = new Rect(x,y,width*size,height*size);
+
+  rect.drawRounded(ctx,size/6)
+  ctx.fillStyle=secondary;
+  ctx.fill();
+
+  rect.drawRounded(ctx,size/6)
+  ctx.strokeStyle=primary;
+  ctx.lineWidth=4;
+  ctx.stroke();
+}
+
+function craftsmanColors(craftsman) {
+  // TODO: Fix this
+  switch(craftsman) {
+    case "IvoryCarver": return ["black", "ivory"]
+    default: return ["white, black"]
+  }
 }
 
 function empireColors(empire) {
-  // todo
   switch(empire){
     case 'Kilwa':
       return ['red', 'white'];

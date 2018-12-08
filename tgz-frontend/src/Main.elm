@@ -12,7 +12,8 @@ module Main exposing
 
 import ApiTypes as ApiTypes
     exposing
-        ( Empire(..)
+        ( Craftsman(..)
+        , Empire(..)
         , EmpirePlaque(..)
         , GameView
         , GenerosityOfKingsState
@@ -20,11 +21,15 @@ import ApiTypes as ApiTypes
         , MapLayout
         , Phase(..)
         , Player
+        , Rotated(..)
         , Specialist(..)
         , decodeGameView
+        , encodeCraftsman
         , encodeEmpire
+        , encodeLocation
         , encodeMapLayout
         , encodeMonuments
+        , getRotated
         , showEmpire
         )
 import Browser
@@ -60,6 +65,7 @@ import Html.Keyed exposing (node)
 import Http
 import Json.Decode as Json
 import Json.Encode as E
+import Layout
 import Parser
 import Ports
 import Task
@@ -97,8 +103,51 @@ encodePlayerMonuments player =
             Nothing
 
 
-overlayPlayer : Player -> Cmd msg
-overlayPlayer player =
+encodePlayerCraftsmenAndEmpire : Player -> Maybe E.Value
+encodePlayerCraftsmenAndEmpire player =
+    case player.empire of
+        Just e ->
+            Just <|
+                E.object
+                    [ ( "empire", encodeEmpire e )
+                    , ( "craftsmen", encodePlayerCraftsmen (Dict.toList player.craftsmen) )
+                    ]
+
+        Nothing ->
+            Nothing
+
+
+encodePlayerCraftsmen : List ( Location, Rotated Craftsman ) -> E.Value
+encodePlayerCraftsmen =
+    let
+        encodeDimensions ( w, h ) =
+            E.object
+                [ ( "width", E.int w )
+                , ( "height", E.int h )
+                ]
+
+        encodePlayerCraftsman ( location, rotatedCraftsman ) =
+            E.object
+                [ ( "location", encodeLocation location )
+                , ( "craftsman", encodeCraftsman (getRotated rotatedCraftsman) )
+                , ( "dimensions", encodeDimensions (Layout.rotatedDimensions rotatedCraftsman) )
+                ]
+    in
+    E.list encodePlayerCraftsman
+
+
+overlayPlayerCraftsmen : Player -> Cmd msg
+overlayPlayerCraftsmen player =
+    case encodePlayerCraftsmenAndEmpire player of
+        Nothing ->
+            Cmd.none
+
+        Just craftsmen ->
+            Ports.overlayPlayerCraftsmen craftsmen
+
+
+overlayPlayerMonuments : Player -> Cmd msg
+overlayPlayerMonuments player =
     case encodePlayerMonuments player of
         Nothing ->
             Cmd.none
@@ -247,18 +296,16 @@ update msg model =
                     Cmd.none
 
                 Just gameView ->
-                    Cmd.batch
-                        (List.map
-                            (\p ->
-                                case encodePlayerMonuments p of
-                                    Nothing ->
-                                        Cmd.none
-
-                                    Just monuments ->
-                                        Ports.overlayPlayerMonuments monuments
-                            )
-                            (Dict.values gameView.state.players)
-                        )
+                    let
+                        cmds =
+                            List.map
+                                (\p -> overlayPlayerMonuments p)
+                                (Dict.values gameView.state.players)
+                                ++ List.map
+                                    (\p -> overlayPlayerCraftsmen p)
+                                    (Dict.values gameView.state.players)
+                    in
+                    Cmd.batch cmds
             )
 
         IssueGameCommand command ->
@@ -368,6 +415,7 @@ renderGame game =
         , div [] [ listPlayers currentPlayerUsername (trace <| Dict.values game.state.players) ]
         , if game.state.round.currentPhase == Just PreSetup then
             renderPreSetupActionBoard game
+
           else
             div [] []
         ]
@@ -480,14 +528,6 @@ renderControlPanel model =
             [ placeholder "Enter command"
             , value (first model.playerCommand)
             , onInput UpdateCommand
-            , onKeyUp
-                (\i ->
-                    if i == 13 then
-                        issueCommandIfPossible parsedCommand
-
-                    else
-                        Noop
-                )
             ]
             []
         , div [] [ button [ onClick (issueCommandIfPossible parsedCommand) ] [ text "Go!" ] ]
@@ -574,14 +614,6 @@ renderGenerosityOfKingsState gameView =
             in
             addOneTo remaining (zip plaques (List.repeat (List.length plaques) allGet))
 
-        renderPlaque plaque =
-            case plaque of
-                ( PlayerPlaque empire, amount ) ->
-                    div [] [ text (showEmpire empire ++ " (" ++ String.fromInt amount ++ ")") ]
-
-                ( ShadipinyiPlaque, amount ) ->
-                    div [] [ text ("Shadipinyi (God of Drunks) (" ++ String.fromInt amount ++ ")") ]
-
         passedPlayers =
             mapMaybe (\playerId -> getPlayerById playerId gameView) state.playersPassed
 
@@ -595,6 +627,15 @@ renderGenerosityOfKingsState gameView =
         , div [] (List.map renderPlaque (plaquesWithCattle state.cattlePool state.plaques))
         , div [] [ text passedPlayersText ]
         ]
+
+
+renderPlaque plaque =
+    case plaque of
+        ( PlayerPlaque empire, amount ) ->
+            div [] [ text (showEmpire empire ++ " (" ++ String.fromInt amount ++ ")") ]
+
+        ( ShadipinyiPlaque, amount ) ->
+            div [] [ text ("Shadipinyi (God of Drunks) (" ++ String.fromInt amount ++ ")") ]
 
 
 getPlayerById : Int -> GameView -> Maybe Player
@@ -635,7 +676,9 @@ main =
         { view = view
         , init = init
         , update = update
-        , subscriptions = \_ -> Ports.mapLayoutRendered (\_ -> MapLayoutRendered)
+        , subscriptions =
+            \_ ->
+                Ports.mapLayoutRendered (\_ -> MapLayoutRendered)
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         }

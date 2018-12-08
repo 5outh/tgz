@@ -36,6 +36,7 @@ module ApiTypes exposing
     , encodeRotated
     , encodeSpecialist
     , encodeUserView
+    , getRotated
     , intDict
     , showEmpire
     , showGod
@@ -685,6 +686,16 @@ type Specialist
 type Rotated a
     = Rotated a
     | UnRotated a
+
+
+getRotated : Rotated a -> a
+getRotated rotated =
+    case rotated of
+        Rotated a ->
+            a
+
+        UnRotated a ->
+            a
 
 
 encodeRotated : (a -> Value) -> Rotated a -> Value

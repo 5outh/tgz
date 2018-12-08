@@ -1,7 +1,8 @@
 import './main.css';
 import { Elm } from './Main.elm';
 import registerServiceWorker from './registerServiceWorker';
-import {overlayPlayerMonuments, renderMapLayout, initializeGameCanvas } from './game';
+import {overlayPlayerMonuments
+    , overlayPlayerCraftsmen, renderMapLayout, initializeGameCanvas } from './game';
 
 var app = Elm.Main.init({
   node: document.getElementById('root')
@@ -15,4 +16,8 @@ app.ports.renderMapLayout.subscribe(function(mapLayout) {
 
 app.ports.overlayPlayerMonuments.subscribe(function(playerMonuments) {
   overlayPlayerMonuments(playerMonuments);
+});
+
+app.ports.overlayPlayerCraftsmen.subscribe(function(playerCraftsmen) {
+  overlayPlayerCraftsmen(playerCraftsmen);
 });
