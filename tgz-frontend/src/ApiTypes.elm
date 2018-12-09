@@ -300,19 +300,19 @@ showEmpire : Empire -> String
 showEmpire empire =
     case empire of
         Kilwa ->
-            "Kilwa"
+            "kilwa"
 
         Mutapa ->
-            "Mutapa"
+            "mutapa"
 
         Zulu ->
-            "Zulu"
+            "zulu"
 
         Lozi ->
-            "Lozi"
+            "lozi"
 
         Mapungubwe ->
-            "Mapungubwe"
+            "mapungubwe"
 
 
 type God
@@ -334,40 +334,40 @@ showGod : God -> String
 showGod god =
     case god of
         Shadipinyi ->
-            "Shadipinyi"
+            "shadipinyi"
 
         Elegua ->
-            "Elegua"
+            "elegua"
 
         Dziva ->
-            "Dziva"
+            "dziva"
 
         Eshu ->
-            "Eshu"
+            "eshu"
 
         Gu ->
-            "Gu"
+            "gu"
 
         Obatala ->
-            "Obatala"
+            "obatala"
 
         Atete ->
-            "Atete"
+            "atete"
 
         TsuiGoab ->
-            "TsuiGoab"
+            "tsui-goab"
 
         Anansi ->
-            "Anansi"
+            "anansi"
 
-        Qamata cattle ->
-            String.concat [ "Qamata (", String.fromInt cattle, ")" ]
+        Qamata _ ->
+            "qamata"
 
         Engai ->
-            "Engai"
+            "engai"
 
         Xango ->
-            "Xango"
+            "xango"
 
 
 type Square

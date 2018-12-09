@@ -2,6 +2,7 @@ TODO:
 
 - ~bug: fix setPrices/raisePrices to override, not append~
 - bug: pass size along to port renderers
+- bug: 'step' is not properly recorded in VR/VP
 
 - Record game events that players didn't do (revenues)
 - Fix winner declaration (tie breakers)
