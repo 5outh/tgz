@@ -26,6 +26,7 @@ export class Rect {
   }
 
   draw(ctx) {
+    let {x,y,w,h} = this;
     ctx.rect(x,y,w,h);
   }
 
@@ -39,5 +40,12 @@ export class Rect {
     ctx.moveTo(x+w,y);
     ctx.lineTo(x,y+w);
     ctx.closePath();
+  }
+
+  scale(amount) {
+    let {x,y,w,h} = this;
+    const [newWidth, newHeight] = [w * amount, h * amount]
+    let [offsetX, offsetY] = [(w - newWidth) / 2, (h - newHeight) / 2]
+    return new Rect(x+offsetX,y+offsetY,newWidth,newHeight);
   }
 }

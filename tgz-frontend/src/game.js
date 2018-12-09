@@ -203,13 +203,21 @@ export function overlayPlayerCraftsman(size, empire, playerCraftsman) {
   const [primary, secondary] = craftsmanColors(craftsman);
   const rect = new Rect(x,y,width*size,height*size);
 
-  rect.drawRounded(ctx,size/6)
-  ctx.fillStyle=secondary;
-  ctx.fill();
+  const [empirePrimary, empireSecondary] = empireColors(empire);
+  const empireRect = new Rect(x,y,size,size).scale(0.5)
 
   rect.drawRounded(ctx,size/6)
+  ctx.fillStyle=secondary;
   ctx.strokeStyle=primary;
   ctx.lineWidth=4;
+  ctx.fill();
+  ctx.stroke();
+
+  empireRect.drawRounded(ctx, 0)
+  ctx.fillStyle=empirePrimary;
+  ctx.strokeStyle=empireSecondary;
+  ctx.lineWidth=2;
+  ctx.fill();
   ctx.stroke();
 }
 

@@ -1,6 +1,7 @@
 TODO:
 
 - ~bug: fix setPrices/raisePrices to override, not append~
+- bug: pass size along to port renderers
 
 - Record game events that players didn't do (revenues)
 - Fix winner declaration (tie breakers)
