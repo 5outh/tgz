@@ -317,7 +317,7 @@ endGenerosityOfKings game = do
   getShadipinyiMod = case playerWithShadipinyi game of
     Nothing            -> Right mempty
     Just (playerId, _) -> case M.lookup ShadipinyiPlaque empireMap of
-      Nothing -> internalError "Shadipinyi plaque not found"
+      Nothing -> internalError "Shadipinyi plaque not found."
       Just cattleAmount ->
         Right $ setPlayer playerId (mempty & cattle .~ cattleAmount)
 
@@ -326,7 +326,7 @@ endGenerosityOfKings game = do
     case playerEmpire player of
       Nothing     -> internalError "Player not found."
       Just empire -> case M.lookup (PlayerPlaque empire) empireMap of
-        Nothing -> internalError "Plaque not found"
+        Nothing -> internalError "Plaque not found."
         Just cattleAmount ->
           Right $ setPlayer playerId (mempty & cattle .~ cattleAmount)
 

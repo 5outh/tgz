@@ -79,12 +79,6 @@ onKeyUp tagger =
     on "keyup" (Json.map tagger keyCode)
 
 
-unsafeSend : msg -> Cmd msg
-unsafeSend msg =
-    Task.succeed msg
-        |> Task.perform identity
-
-
 
 -- Encode a player for use with map overlay
 
@@ -370,12 +364,12 @@ view model =
         gameDiv =
             case model.gameView of
                 Just gameView ->
-                    renderGame gameView
+                    renderGame gameView (renderControlPanel model)
 
                 _ ->
                     emptyDiv "Loading..."
     in
-    Browser.Document "The Great Zimbabwe" [ loadingDiv, errorDiv, gameDiv, renderControlPanel model ]
+    Browser.Document "The Great Zimbabwe" [ loadingDiv, errorDiv, gameDiv ]
 
 
 
@@ -396,8 +390,8 @@ lookupCurrentPlayer game =
             Dict.get playerId game.state.players
 
 
-renderGame : GameView -> Html Msg
-renderGame game =
+renderGame : GameView -> Html Msg -> Html Msg
+renderGame game controlPanel =
     let
         currentPlayerUsername =
             Maybe.map (.info >> .username) (lookupCurrentPlayer game)
@@ -412,6 +406,7 @@ renderGame game =
 
           else
             div [] []
+        , controlPanel
         , div [] [ listPlayers currentPlayerUsername (trace <| Dict.values game.state.players) ]
         , if game.state.round.currentPhase == Just PreSetup then
             renderPreSetupActionBoard game

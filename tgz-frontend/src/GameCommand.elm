@@ -58,6 +58,7 @@ import Parser
         , float
         , keyword
         , oneOf
+        , problem
         , spaces
         , succeed
         , symbol
@@ -280,23 +281,95 @@ parseGod =
 
 
 
+-- raise a9
+-- hub a7
+-- use-craftsman u8 u3
+
+
+parseRaiseMonuments : Parser ReligionAndCultureCommand3
+parseRaiseMonuments =
+    let
+        parseRaiseMonumentsCommands1 revList =
+            oneOf
+                [ succeed (\loc commands -> Loop (( loc, commands ) :: revList))
+                    |. keyword "raise"
+                    |. spaces
+                    |= parseLocation
+                    |. spaces
+                    |= parseRaiseMonumentCommands
+                    |. chompUntilEndOr "\n"
+                    |. spaces
+                , succeed ()
+                    |> Parser.map
+                        (\_ -> Done (List.reverse revList))
+                ]
+    in
+    Parser.map RaiseMonuments
+        (Parser.loop [] parseRaiseMonumentsCommands1
+            |> andThen (checkEmpty "raise-monument command")
+        )
+
+
+checkEmpty name list =
+    case list of
+        [] ->
+            problem ("Got an empty list of " ++ name)
+
+        _ ->
+            succeed list
+
+
+parseRaiseMonumentCommands : Parser (List RaiseMonumentCommand)
+parseRaiseMonumentCommands =
+    let
+        parseRaiseMonumentCommands1 revList =
+            oneOf
+                [ succeed (\loc -> Loop (UseHub loc :: revList))
+                    |. keyword "hub"
+                    |. spaces
+                    |= parseLocation
+                    |. chompUntilEndOr "\n"
+                    |. spaces
+                , succeed (\loc1 loc2 -> Loop (UseCraftsman loc1 loc2 :: revList))
+                    |. keyword "use-craftsman"
+                    |. spaces
+                    |= parseLocation
+                    |. spaces
+                    |= parseLocation
+                    |. chompUntilEndOr "\n"
+                    |. spaces
+                , succeed ()
+                    |> Parser.map (\_ -> Done (List.reverse revList))
+                ]
+    in
+    Parser.loop [] parseRaiseMonumentCommands1
+
+
+
 -- PlaceCraftsmen (List ( Location, Rotated Craftsman ))
 -- place-craftsman a0 (rotated IvoryCarver)
 -- place-craftsman a0 IvoryCarver
 
 
-parsePlaceCraftsmen : Parser (Maybe (List ( Location, Rotated Craftsman )))
+parsePlaceCraftsmen : Parser (List ( Location, Rotated Craftsman ))
 parsePlaceCraftsmen =
     let
-        listToMaybe list =
-            case list of
-                [] ->
-                    Nothing
-
-                theList ->
-                    Just theList
+        parsePlaceCraftsmanCommands revList =
+            oneOf
+                [ succeed (\location craftsman -> Loop (( location, craftsman ) :: revList))
+                    |. keyword "place-craftsman"
+                    |. spaces
+                    |= parseLocation
+                    |. spaces
+                    |= parseRotatedCraftsman
+                    |. chompUntilEndOr "\n"
+                    |. spaces
+                , succeed ()
+                    |> Parser.map (\_ -> Done (List.reverse revList))
+                ]
     in
-    Parser.map listToMaybe (Parser.loop [] parsePlaceCraftsmanCommands)
+    Parser.loop [] parsePlaceCraftsmanCommands
+        |> andThen (checkEmpty "PlaceCraftsmanCommands")
 
 
 parseSetPrice : Parser (List SetPrice)
@@ -317,24 +390,6 @@ parseSetPrice =
                 ]
     in
     Parser.loop [] parseSetPrice1
-
-
-parsePlaceCraftsmanCommands :
-    List ( Location, Rotated Craftsman )
-    -> Parser (Step (List ( Location, Rotated Craftsman )) (List ( Location, Rotated Craftsman )))
-parsePlaceCraftsmanCommands revList =
-    oneOf
-        [ succeed (\location craftsman -> Loop (( location, craftsman ) :: revList))
-            |. keyword "place-craftsman"
-            |. spaces
-            |= parseLocation
-            |. spaces
-            |= parseRotatedCraftsman
-            |. chompUntilEndOr "\n"
-            |. spaces
-        , succeed ()
-            |> Parser.map (\_ -> Done (List.reverse revList))
-        ]
 
 
 parseRotatedCraftsman : Parser (Rotated Craftsman)
@@ -381,27 +436,23 @@ parseReligionAndCultureCommand3 =
             |= parseLocation
             |. chompUntilEndOr "\n"
             |. spaces
-
-        -- NB. this will 'succeed Nothing' in the case of failure (I think) so maybe
-        -- it should come last?
-        , parsePlaceCraftsmen |> andThen parseSetPrices
-
-        -- TODO:
-        -- , -- RaiseMonuments (List ( Location, List RaiseMonumentCommand ))
+        , succeed Just |= parseRaiseMonuments
+        , succeed Just |= (parsePlaceCraftsmen |> andThen parseSetPrices)
         , succeed Nothing |. spaces
         ]
 
 
-parseSetPrices :
-    Maybe (List ( Location, Rotated Craftsman ))
-    -> Parser (Maybe ReligionAndCultureCommand3)
-parseSetPrices mPlacements =
-    case mPlacements of
-        Nothing ->
-            succeed Nothing
 
-        Just placements ->
-            Parser.map (\setPrices -> Just <| PlaceCraftsmen placements setPrices) parseSetPrice
+-- Note this is allowed to be empty
+
+
+parseSetPrices :
+    List ( Location, Rotated Craftsman )
+    -> Parser ReligionAndCultureCommand3
+parseSetPrices placements =
+    Parser.map
+        (\setPrices -> PlaceCraftsmen placements setPrices)
+        parseSetPrice
 
 
 parseLocations : Parser (List Location)
