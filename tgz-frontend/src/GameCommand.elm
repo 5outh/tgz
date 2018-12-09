@@ -238,7 +238,12 @@ parseUseSpecialist =
         [ succeed (Just UseShaman) |. keyword "shaman" |. chompUntilEndOr "\n" |. spaces
         , succeed (Just UseBuilder) |. keyword "builder" |. chompUntilEndOr "\n" |. spaces
         , succeed (Just UseNomads) |. keyword "nomads" |. chompUntilEndOr "\n" |. spaces
-        , succeed (Just << UseHerd) |. keyword "herd" |. spaces |= Parser.int
+        , succeed (Just << UseHerd)
+            |. keyword "herd"
+            |. spaces
+            |= Parser.int
+            |. chompUntilEndOr "\n"
+            |. spaces
         , succeed (\loc1 loc2 -> Just (UseRainCeremony loc1 loc2))
             |. keyword "rain-ceremony"
             |. spaces
