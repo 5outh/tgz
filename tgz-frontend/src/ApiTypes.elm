@@ -101,6 +101,38 @@ decodePoints =
         |> required "step" Decode.int
 
 
+type alias TechnologyCardState =
+    { price : Int
+    , cattle : Int
+    }
+
+
+decodeTechnologyCardState : Decoder TechnologyCardState
+decodeTechnologyCardState =
+    Decode.succeed (\a b -> TechnologyCardState a b)
+        |> required "price" Decode.int
+        |> required "cattle" Decode.int
+
+
+type alias TechnologyCard =
+    { name : String
+    , craftsmanType : Craftsman
+    , victoryRequirement : Int
+    , victoryPoints : Int
+    , cost : Int
+    }
+
+
+decodeTechnologyCard : Decoder TechnologyCard
+decodeTechnologyCard =
+    Decode.succeed (\a b c d e -> TechnologyCard a b c d e)
+        |> required "name" Decode.string
+        |> required "craftsman_type" decodeCraftsman
+        |> required "victory_requirement" Decode.int
+        |> required "victory_points" Decode.int
+        |> required "cost" Decode.int
+
+
 type alias Player =
     { info : PlayerInfo
     , victoryRequirement : Points
@@ -109,9 +141,7 @@ type alias Player =
     , cattle : Int
     , monuments : Dict Location Int
     , craftsmen : Dict Location (Rotated Craftsman)
-
-    --, technologyCards: List (TechnologyCard, Int) TODO
-    -- ^ note: TechnologyCard isn't comparable, so we have to decode to a list
+    , technologyCards : List ( TechnologyCard, TechnologyCardState )
     , specialists : List ( Specialist, Int )
     , god : Maybe God
     }
@@ -120,7 +150,7 @@ type alias Player =
 decodePlayer : Decoder Player
 decodePlayer =
     Decode.succeed
-        (\a b c d e f g h i ->
+        (\a b c d e f g h i j ->
             { info = a
             , victoryRequirement = b
             , victoryPoints = c
@@ -129,7 +159,8 @@ decodePlayer =
             , monuments = f
             , craftsmen = g
             , specialists = h
-            , god = i
+            , technologyCards = i
+            , god = j
             }
         )
         |> required "info" decodePlayerInfo
@@ -140,8 +171,14 @@ decodePlayer =
         |> required "monuments" decodeMonuments
         |> required "craftsmen" (decodeLocationDict (decodeRotated decodeCraftsman))
         |> required "specialists"
-            (Decode.list (Decode.map2 tuple2 (Decode.index 0 decodeSpecialist) (Decode.index 1 Decode.int)))
+            (decodeMap decodeSpecialist Decode.int)
+        |> required "technology_cards"
+            (decodeMap decodeTechnologyCard decodeTechnologyCardState)
         |> required "god" (Decode.maybe decodeGod)
+
+
+decodeMap decodeFirst decodeSecond =
+    Decode.list (Decode.map2 tuple2 (Decode.index 0 decodeFirst) (Decode.index 1 decodeSecond))
 
 
 decodeEmpire : Decoder Empire

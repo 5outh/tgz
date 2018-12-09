@@ -565,6 +565,7 @@ playerHasCardOfType craftsman playerId game = do
     (\playerCard -> technologyCardCraftsmanType playerCard == craftsman)
     (M.keys $ player ^. technologyCards)
 
+-- TODO: override, not append
 setPrices
   :: [(Int, Craftsman)] -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 setPrices prices playerId game = PlayerAction $ do
@@ -575,6 +576,7 @@ setPrices prices playerId game = PlayerAction $ do
         game
         prices
 
+-- TODO: override, not append
 raisePrices
   :: [(Int, Craftsman)] -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
 raisePrices prices playerId game = PlayerAction $ do
@@ -609,11 +611,13 @@ setPrice craftsman newPrice playerId game = do
       , ": you do not have the necessary Technology Card."
       ]
 
-    Just (card, cardState) -> do
+    Just (card, TechnologyCardState {..}) -> do
+      let priceDiff = fromIntegral newPrice - technologyCardStatePrice
+
       pure $ game <> setPlayer
         playerId
         (mempty & technologyCards .~ M.singleton card
-                                                 (mempty & price .~ newPrice)
+                                                 (mempty & price .~ priceDiff)
         )
 
 -- Raise the price of a technology card. Only possible after placing craftsmen.
@@ -636,14 +640,19 @@ raisePrice craftsman newPrice playerId game = do
       , ": you do not have the necessary Technology Card."
       ]
 
-    Just (card, TechnologyCardState {..}) -> do
+    Just (card, state@(TechnologyCardState {..})) -> do
       (fromIntegral newPrice <= technologyCardStatePrice)
         `impliesInvalid` "Price must increase."
+
+      player <- getPlayer playerId game
+
+      let priceDiff = fromIntegral newPrice - technologyCardStatePrice
+
       pure $ game <> setPlayer
         playerId
         (mempty & technologyCards .~ M.singleton
           card
-          (mempty & price .~ fromIntegral newPrice)
+          (mempty & price .~ fromIntegral priceDiff)
         )
 
 data RaiseMonumentCommand
