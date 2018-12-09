@@ -91,8 +91,7 @@ runGameCommand game playerId = \case
 handleFinishReligionAndCulture :: Game -> Either GameError Game
 handleFinishReligionAndCulture game = do
   let shouldFinishRound =
-        (traceShowId $ game ^. round . step)
-          >= (traceShowId $ length (game ^. players) - 1)
+        (game ^. round . step) >= (length (game ^. players) - 1)
 
   if not shouldFinishRound
     then cyclePlayers game
@@ -115,6 +114,7 @@ handleFinishReligionAndCulture game = do
             . resetTechnologyCards
             . resetSpecialists
             . resetGods
+            . resetUsedMarkers
             $ game0
 
 determineWinner players = do
@@ -131,6 +131,9 @@ determineWinner players = do
       Just PlayerInfo {..} -> Just playerInfoPlayerId
     manyPlayers -> Nothing -- TODO: ties
 
+resetUsedMarkers :: Game -> Game
+resetUsedMarkers = over (round . usedMarkers) (const mempty)
+
 resetTechnologyCards :: Game -> Game
 resetTechnologyCards =
   over (players . traverse . technologyCards . traverse . cattle) (const 0)
@@ -146,22 +149,26 @@ resetGods = over (players . traverse . god) $ \case
 playerRevenues :: PlayerId -> Game -> GameEvent 'Revenues
 playerRevenues playerId game = GameEvent $ do
   player <- getPlayer playerId game
-  let
-    technologyCardRevenue =
-      sum
-        $  map (technologyCardStateCattle)
-        $  M.elems
-        $  player
-        ^. technologyCards
-    specialistRevenue = sum $ M.elems $ player ^. specialists
-    godRevenue        = case player ^. god of
-      Just (Qamata n) -> n
-      _               -> 0
-    updates =
-      [ addCattle
-          (technologyCardRevenue + specialistRevenue + fromIntegral godRevenue)
-          playerId
-      ]
+  let technologyCardRevenue =
+        sum
+          $  map (technologyCardStateCattle)
+          $  M.elems
+          $  player
+          ^. technologyCards
+      specialistRevenue = sum $ M.elems $ player ^. specialists
+      godRevenue        = case player ^. god of
+        Just (Qamata n) -> n
+        _               -> 0
+      monumentRevenue = maximum . M.elems $ player ^. monuments
+      updates =
+        [ addCattle
+            ( technologyCardRevenue
+            + specialistRevenue
+            + fromIntegral godRevenue
+            + fromIntegral monumentRevenue
+            )
+            playerId
+        ]
 
   pure $ game <> mconcat updates
 

@@ -28,4 +28,16 @@ export class Rect {
   draw(ctx) {
     ctx.rect(x,y,w,h);
   }
+
+  drawX(ctx) {
+    let {x,y,w,h} = this;
+
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.lineTo(x+w,y+h);
+
+    ctx.moveTo(x+w,y);
+    ctx.lineTo(x,y+w);
+    ctx.closePath();
+  }
 }

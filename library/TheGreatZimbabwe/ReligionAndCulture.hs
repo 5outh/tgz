@@ -103,7 +103,7 @@ useShaman
   -> PlayerAction 'ReligionAndCulture
 useShaman resource location playerId game =
   PlayerAction
-    $ executeIfEmpty "Cannot build resource" location playerId game
+    $ executeIfEmpty NotMonument "Cannot build resource" location playerId game
     $ do
         playerIs playerId game
         phaseIs ReligionAndCulture game
@@ -154,6 +154,7 @@ useRainCeremony loc1 loc2 playerId game = PlayerAction $ do
 
   let convertLocationToWater :: Location -> Either GameError Game
       convertLocationToWater loc = executeIfEmpty
+        NotMonument
         "Cannot convert to water"
         loc
         playerId
@@ -220,49 +221,64 @@ useNomads playerId game = PlayerAction $ do
     , setPlayer playerId (mempty & activations .~ S.singleton NomadsActive)
     ]
 
+data IsMonumentPlacement = Monument | NotMonument
+  deriving (Show, Eq)
+
 executeIfEmpty
-  :: Text
+  :: IsMonumentPlacement
+  -> Text
   -> Location
   -> PlayerId
   -> Game
   -> Either GameError a
   -> Either GameError a
-executeIfEmpty message location playerId game executeAction = do
-  let mLocated = locatedAt location game
-  let invalidMessage msg =
-        invalidAction $ message <> " " <> pprintLocation location <> ": " <> msg
+executeIfEmpty isMonumentPlacement message location playerId game executeAction
+  = do
+    let mLocated = locatedAt location game
+    let invalidMessage msg =
+          invalidAction
+            $  message
+            <> " "
+            <> pprintLocation location
+            <> ": "
+            <> msg
 
-  case mLocated of
-    Nothing      -> invalidMessage "it's off the board!"
+    case mLocated of
+      Nothing      -> invalidMessage "it's off the board!"
 
-    Just located -> case located of
-      LocatedPlayerMonument player _ ->
-        invalidMessage
-          $  showPlayerUsername player
-          <> " has already built a monument there!"
-      LocatedPlayerCraftsman player _ ->
-        invalidMessage
-          $  showPlayerUsername player
-          <> " has already built a craftsman there!"
-      LocatedSquare square -> case square of
-        Water     -> invalidMessage "can't build on water!"
-        Land land -> case land of
-          StartingArea -> invalidMessage "can't build on starting area!"
-          Resource resource ->
-            invalidMessage
-              $  "can't build on resource tile: "
-              <> tshow resource
-              <> "!"
-          BlankLand -> do
-            player <- getPlayer playerId game
-            if NomadsActive `S.member` (player ^. activations)
-              then executeAction
-              else case playerMonumentAround location game of
-                Just (player, _) ->
-                  invalidMessage
-                    $ showPlayerUsername player
-                    <> " has already built a monument too close to this location!"
-                Nothing -> executeAction
+      Just located -> case located of
+        LocatedPlayerMonument player _ ->
+          invalidMessage
+            $  showPlayerUsername player
+            <> " has already built a monument there!"
+        LocatedPlayerCraftsman player _ ->
+          invalidMessage
+            $  showPlayerUsername player
+            <> " has already built a craftsman there!"
+        LocatedSquare square -> case square of
+          Water     -> invalidMessage "can't build on water!"
+          Land land -> case land of
+            StartingArea -> invalidMessage "can't build on starting area!"
+            Resource resource ->
+              invalidMessage
+                $  "can't build on resource tile: "
+                <> tshow resource
+                <> "!"
+            BlankLand -> do
+              player <- getPlayer playerId game
+              if NomadsActive
+                 `S.member` (player ^. activations)
+                 ||         isMonumentPlacement
+                 ==         NotMonument
+              then
+                executeAction
+              else
+                case playerMonumentAround location game of
+                  Just (player, _) ->
+                    invalidMessage
+                      $ showPlayerUsername player
+                      <> " has already built a monument too close to this location!"
+                  Nothing -> executeAction
 
 buildMonuments
   :: [Location] -> PlayerId -> Game -> PlayerAction 'ReligionAndCulture
@@ -289,7 +305,7 @@ buildMonument location playerId game = PlayerAction $ do
                        (mempty { playerMonuments = M.singleton location 1 })
           <> addVictoryPoints 1 playerId game
   let message = "Can't build a new monument"
-  executeIfEmpty message location playerId game executeAction
+  executeIfEmpty Monument message location playerId game executeAction
 
 data Located
   = LocatedSquare Square
@@ -390,8 +406,12 @@ placeCraftsman
 placeCraftsman location rCraftsman playerId game0 = do
   let craftsman          = getRotated rCraftsman
       craftsmanLocations = coveredLocations location rCraftsman
-      isEmpty loc =
-        executeIfEmpty "Cannot place craftsman" loc playerId game0 (pure ())
+      isEmpty loc = executeIfEmpty NotMonument
+                                   "Cannot place craftsman"
+                                   loc
+                                   playerId
+                                   game0
+                                   (pure ())
 
   case M.lookup craftsman (game0 ^. craftsmanTiles) of
     Nothing ->
@@ -465,7 +485,7 @@ placeCraftsman location rCraftsman playerId game0 = do
 
   -- Initially set the price of the craftsman to 1.
   -- Players can raise prices if they want using the 'raise-prices' command
-  pure $ game <> (traceShowId $ mconcat updates)
+  pure $ game <> (mconcat updates)
 
 reachableLocationsUsingOneHub
   :: MapGraph -> S.Set Location -> Game -> Either GameError (S.Set Location)
@@ -677,9 +697,10 @@ raiseMonumentForLocation location playerId mapGraph game commands = do
         <> pprintLocation location
         <> " before raising it."
     Just currentHeight -> do
-      let desiredHeight = (fromIntegral currentHeight + 1)
-      -- If this completes, it worked.
-      (game0, commands0) <- go desiredHeight game commands
+      let neededHeight = (fromIntegral currentHeight)
+      (game0, commands0) <- go neededHeight game commands
+
+      pure $ traceShowId (game0, commands0)
 
       let heightVP = \case
             1 -> 1
@@ -689,17 +710,18 @@ raiseMonumentForLocation location playerId mapGraph game commands = do
             5 -> 8
           updates =
             [ setPlayer playerId (mempty & monuments .~ M.singleton location 1)
-            , addVictoryPoints (heightVP desiredHeight) playerId game0
+            , addVictoryPoints (heightVP (succ neededHeight)) playerId game0
             ]
 
       -- if there are additional commands, just do it again
       case commands0 of
         []                -> pure (game0 <> mconcat updates)
-        remainingCommands -> raiseMonumentForLocation location
-                                                      playerId
-                                                      mapGraph
-                                                      game0
-                                                      remainingCommands
+        remainingCommands -> raiseMonumentForLocation
+          location
+          playerId
+          mapGraph
+          (game0 <> mconcat updates)
+          remainingCommands
  where
   -- nb. there is a case where we raise a monument more than once, so retain the remaining commands
   go
@@ -715,7 +737,7 @@ raiseMonumentForLocation location playerId mapGraph game commands = do
       (mempty { raiseMonumentStateCurrentLocation = Just location })
       game0
       commands0
-    go (height - 1) game1 commands
+    go (height - 1) game1 additionalCommands
 
 -- Fetch one level of ritual goods.
 raiseMonument1 playerId mapGraph state@(RaiseMonumentState {..}) game = \case
@@ -793,7 +815,7 @@ raiseMonument1 playerId mapGraph state@(RaiseMonumentState {..}) game = \case
             threshold    = if player ^. god == Just Atete then 2 else 1
 
         (fromMaybe 0 (M.lookup resourceLocation usedMarkers') >= threshold)
-          `impliesError` "Cannot use that resource: it has already been used this round."
+          `impliesInvalid` "Cannot use that resource: it has already been used this round."
 
         -- if all are fine, add a used marker to resource and update state
 
@@ -921,7 +943,7 @@ secondaryCraftsmanExists craftsman game = do
   mLocations <-
     for (craftsmanSecondaryCraftsman craftsman) $ \associatedCraftsman -> do
       findCraftsmanLocations associatedCraftsman game
-  pure $ S.null (fromMaybe S.empty mLocations)
+  pure $ not $ S.null (fromMaybe S.empty mLocations)
 
 raiseMonuments
   :: [(Location, [RaiseMonumentCommand])]

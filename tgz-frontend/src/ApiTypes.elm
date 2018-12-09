@@ -563,7 +563,7 @@ encodeUserView val =
 type alias Round =
     { players : List Int
     , currentPlayer : Maybe Int
-    , usedMarkers : List ( Location, UsedMarker )
+    , usedMarkers : List ( Location, Int )
     , generosityOfKingsState : GenerosityOfKingsState
     , currentPhase : Maybe Phase
     }
@@ -582,7 +582,7 @@ decodeRound =
         )
         |> required "players" (Decode.list Decode.int)
         |> fnullable "current_player" Decode.int
-        |> required "used_markers" (Decode.list (Decode.map2 tuple2 (Decode.index 0 decodeLocation) (Decode.index 1 decodeUsedMarker)))
+        |> required "used_markers" (Decode.list (Decode.map2 tuple2 (Decode.index 0 decodeLocation) (Decode.index 1 Decode.int)))
         |> required "generosity_of_kings_state" decodeGenerosityOfKingsState
         |> fnullable "current_phase" decodePhase
 

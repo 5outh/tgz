@@ -45,8 +45,8 @@ export function renderMapLayout(mapLayout) {
       const [textX, textY] = [x + (2*padding), y + 2*padding]
       const [locTextX, locTextY] = [x + (1.5*smallPadding), y + 2.5*smallPadding]
 
+      ctx.fillStyle = 'Linen';
       if (square.Land) {
-        ctx.fillStyle = 'Linen';
         if (square.Land.StartingArea) {
           ctx.strokeStyle="Tan";
           ctx.fillRect(x, y, size, size)
@@ -64,26 +64,22 @@ export function renderMapLayout(mapLayout) {
           ctx.strokeStyle="Tan";
           switch(square.Land.Resource) {
             case "Clay":
-              ctx.fillStyle = 'Tomato';
-              //ctx.fillRect(x, y, size, size)
+              ctx.fillRect(x, y, size, size)
               ctx.font = textSize + 'px monospace';
               ctx.fillText('\u26F0\uFE0F', textX, textY)
               break;
             case "Diamonds":
-              ctx.fillStyle = 'SkyBlue';
-              //ctx.fillRect(x, y, size, size)
+              ctx.fillRect(x, y, size, size)
               ctx.font = textSize + 'px monospace';
               ctx.fillText('\uD83D\uDC8E', textX, textY)
               break;
             case "Ivory":
-              ctx.fillStyle = 'GreenYellow';
-              //ctx.fillRect(x, y, size, size)
+              ctx.fillRect(x, y, size, size)
               ctx.font = textSize + 'px monospace';
               ctx.fillText('\uD83D\uDC18', textX, textY)
               break;
             case "Wood":
-              ctx.fillStyle = 'MediumOrchid';
-              //ctx.fillRect(x, y, size, size)
+              ctx.fillRect(x, y, size, size)
               ctx.font = textSize + 'px monospace';
               ctx.fillText('\uD83C\uDF33', textX, textY)
               break;
@@ -195,9 +191,6 @@ export function overlayPlayerCraftsmen(playerCraftsmen) {
 }
 
 export function overlayPlayerCraftsman(size, empire, playerCraftsman) {
-  console.log("got");
-  console.log(playerCraftsman);
-
   var ctx = getGameCanvasContext()
   // TODO: Fix this
 
@@ -220,11 +213,25 @@ export function overlayPlayerCraftsman(size, empire, playerCraftsman) {
   ctx.stroke();
 }
 
-function craftsmanColors(craftsman) {
-  // TODO: Fix this
-  switch(craftsman) {
-    case "IvoryCarver": return ["black", "ivory"]
-    default: return ["white, black"]
+export function overlayUsedMarkers(usedMarkers) {
+  var ctx = getGameCanvasContext()
+
+  // either 12 or 18 squares
+  // TODO: need size from somewhere
+  let numSquares = 18
+  //if (craftsmen.length == 144) {
+    //numSquares = 12;
+  //}
+
+  const size = 720 / numSquares
+
+  for (let i = 0; i < usedMarkers.length; i++) {
+      let times = usedMarkers[i].times
+      let [x,y] = locationToCoordinates(size, usedMarkers[i].location)
+      let rect = new Rect(x,y,size,size)
+      rect.drawX(ctx);
+      ctx.strokeStyle = 'black';
+      ctx.stroke();
   }
 }
 
@@ -244,3 +251,19 @@ function empireColors(empire) {
       return ['black', 'white'];
   }
 }
+
+function craftsmanColors(craftsman) {
+  // TODO: Fix this
+  switch(craftsman) {
+    case "IvoryCarver": return ["black", "ivory"]
+    case "Potter": return ["black", "Orange"]
+    case "WoodCarver": return ["black", "Purple"]
+    case "DiamondCutter": return ["black", "LightBlue"]
+
+    case "VesselMaker": return ["gold", "Orange"]
+    case "ThroneMaker": return ["gold", "Purple"]
+    case "Sculptor": return ["gold", "ivory"]
+    default: return ["white, black"]
+  }
+}
+

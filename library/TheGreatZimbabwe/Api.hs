@@ -92,21 +92,13 @@ routes pool = do
           Just (Right (game, gameView)) -> do
             -- TODO:
             -- validatePlayerOwnsCommand c
-            -- TODO: Don't allow commit of partial religion and culture action
-            -- (require 'end') (this can probably be noted in the textarea too)
 
-            let
-              saveCommand = void $ runDB pool $ Command.insertGameCommand
-                (entityKey game)
-                (entityKey user)
-                now
-                command
-              shouldSave = not preview && case command of
-                  -- Religion and culture commands must explicitly be ended.
-                ReligionAndCultureCommand ReligionAndCultureMultiCommand {..}
-                  -> religionAndCultureMultiCommandEnd
-                _ -> True
-
+            let saveCommand = void $ runDB pool $ Command.insertGameCommand
+                  (entityKey game)
+                  (entityKey user)
+                  now
+                  command
+                shouldSave = not preview
 
             when shouldSave saveCommand
             status ok200 *> json gameView

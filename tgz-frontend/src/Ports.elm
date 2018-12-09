@@ -2,6 +2,7 @@ port module Ports exposing
     ( mapLayoutRendered
     , overlayPlayerCraftsmen
     , overlayPlayerMonuments
+    , overlayUsedMarkers
     , playerMonumentsOverlaid
     , renderMapLayout
     )
@@ -21,6 +22,9 @@ port overlayPlayerMonuments : E.Value -> Cmd msg
 
 
 port overlayPlayerCraftsmen : E.Value -> Cmd msg
+
+
+port overlayUsedMarkers : E.Value -> Cmd msg
 
 
 

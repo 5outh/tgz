@@ -297,8 +297,6 @@ parseRaiseMonuments =
                     |= parseLocation
                     |. spaces
                     |= parseRaiseMonumentCommands
-                    |. chompUntilEndOr "\n"
-                    |. spaces
                 , succeed ()
                     |> Parser.map
                         (\_ -> Done (List.reverse revList))

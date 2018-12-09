@@ -83,6 +83,18 @@ onKeyUp tagger =
 -- Encode a player for use with map overlay
 
 
+encodeUsedMarkers : List ( Location, Int ) -> E.Value
+encodeUsedMarkers =
+    let
+        encodeUsedMarker ( location, times ) =
+            E.object
+                [ ( "location", encodeLocation location )
+                , ( "times", E.int times )
+                ]
+    in
+    E.list encodeUsedMarker
+
+
 encodePlayerMonuments : Player -> Maybe E.Value
 encodePlayerMonuments player =
     case player.empire of
@@ -150,6 +162,11 @@ overlayPlayerMonuments player =
             Ports.overlayPlayerMonuments monuments
 
 
+overlayUsedMarkers : List ( Location, Int ) -> Cmd msg
+overlayUsedMarkers usedMarkers =
+    Ports.overlayUsedMarkers (encodeUsedMarkers usedMarkers)
+
+
 
 ---- ROUTING ----
 
@@ -200,6 +217,18 @@ issueCommand gameId username command =
         decodeGameView
 
 
+previewCommand gameId username command =
+    Http.post
+        ("http://localhost:8000/game/"
+            ++ String.fromInt gameId
+            ++ "/player/"
+            ++ username
+            ++ "/command?preview=true"
+        )
+        (Http.jsonBody (encodeGameCommand command))
+        decodeGameView
+
+
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
@@ -242,6 +271,7 @@ type Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | IssueGameCommand GameCommand
+    | PreviewGameCommand GameCommand
     | UpdateCommand String
     | MapLayoutRendered
 
@@ -298,6 +328,7 @@ update msg model =
                                 ++ List.map
                                     (\p -> overlayPlayerCraftsmen p)
                                     (Dict.values gameView.state.players)
+                                ++ [ overlayUsedMarkers gameView.state.round.usedMarkers ]
                     in
                     Cmd.batch cmds
             )
@@ -306,6 +337,14 @@ update msg model =
             case model.route of
                 Just (GamePlayer gameId username) ->
                     ( model, Http.send GotGame (issueCommand gameId username command) )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        PreviewGameCommand command ->
+            case model.route of
+                Just (GamePlayer gameId username) ->
+                    ( model, Http.send GotGame (previewCommand gameId username command) )
 
                 _ ->
                     ( model, Cmd.none )
@@ -517,15 +556,26 @@ renderControlPanel model =
 
                 Just gameCommand ->
                     IssueGameCommand gameCommand
+
+        previewCommandIfPossible cmd =
+            case cmd of
+                Nothing ->
+                    Noop
+
+                Just gameCommand ->
+                    PreviewGameCommand gameCommand
     in
     div []
         [ textarea
             [ placeholder "Enter command"
             , value (first model.playerCommand)
             , onInput UpdateCommand
+            , style "min-width" "300px"
+            , style "min-height" "100px"
             ]
             []
-        , div [] [ button [ onClick (issueCommandIfPossible parsedCommand) ] [ text "Go!" ] ]
+        , div [] [ button [ onClick (previewCommandIfPossible parsedCommand) ] [ text "Preview" ] ]
+        , div [] [ button [ onClick (issueCommandIfPossible parsedCommand) ] [ text "Submit" ] ]
         , div [] [ text <| Debug.toString parsedCommand ]
         ]
 
