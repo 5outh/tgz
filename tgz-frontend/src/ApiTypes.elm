@@ -43,6 +43,7 @@ module ApiTypes exposing
     , showCraftsman
     , showEmpire
     , showGod
+    , showResource
     , showSpecialist
     )
 
@@ -77,13 +78,16 @@ type alias Game =
     , technologyCards : List ( Craftsman, List TechnologyCard )
     , winner : Maybe Int
     , step : Int
+    , resourceTiles : List ( Resource, Int )
+    , waterTiles : Int
+    , craftsmanTiles : List ( Craftsman, Int )
     }
 
 
 decodeGame : Decoder Game
 decodeGame =
     Decode.succeed
-        (\a b c d e f g h ->
+        (\a b c d e f g h i j k ->
             { players = a
             , round = b
             , mapLayout = c
@@ -92,6 +96,9 @@ decodeGame =
             , technologyCards = f
             , winner = g
             , step = h
+            , resourceTiles = i
+            , waterTiles = j
+            , craftsmanTiles = k
             }
         )
         |> required "players" (intDict decodePlayer)
@@ -103,6 +110,11 @@ decodeGame =
             (decodeMap decodeCraftsman (Decode.list decodeTechnologyCard))
         |> required "winner" (Decode.nullable Decode.int)
         |> required "step" Decode.int
+        |> required "resource_tiles"
+            (decodeMap decodeResource Decode.int)
+        |> required "water_tiles" Decode.int
+        |> required "craftsman_tiles"
+            (decodeMap decodeCraftsman Decode.int)
 
 
 type alias Points =
@@ -461,6 +473,22 @@ type Resource
     | Wood
     | Ivory
     | Diamonds
+
+
+showResource : Resource -> String
+showResource resource =
+    case resource of
+        Clay ->
+            "clay"
+
+        Wood ->
+            "wood"
+
+        Ivory ->
+            "ivory"
+
+        Diamonds ->
+            "diamonds"
 
 
 decodeResource : Decoder Resource
