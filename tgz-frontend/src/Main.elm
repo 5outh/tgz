@@ -68,6 +68,7 @@ import Msg exposing (Msg(..))
 import Parser
 import Player exposing (..)
 import Ports
+import Supply exposing (renderSupply)
 import Task
 import Tuple exposing (first, second)
 import Url
@@ -400,10 +401,6 @@ view model =
     Browser.Document "The Great Zimbabwe" [ loadingDiv, errorDiv, gameDiv ]
 
 
-
--- TODO: refactor to place control panel within
-
-
 trace val =
     Debug.log (Debug.toString val) val
 
@@ -435,13 +432,32 @@ renderGame game controlPanel =
           else
             div [] []
         , controlPanel
-        , div [] [ listPlayers currentPlayerUsername (trace <| Dict.values game.state.players) ]
+        , div []
+            [ listPlayers currentPlayerUsername (sortedPlayers game)
+            ]
         , if game.state.round.currentPhase == Just PreSetup then
             renderPreSetupActionBoard game
 
           else
             div [] []
+        , renderSupply game
         ]
+
+
+sortedPlayers : GameView -> List Player
+sortedPlayers game =
+    let
+        playerOrder =
+            game.state.round.players
+
+        players =
+            game.state.players
+    in
+    catMaybes (List.map (\k -> Dict.get k players) playerOrder)
+
+
+
+--game.state.round.playerCommand
 
 
 renderControlPanel : Model -> Html Msg

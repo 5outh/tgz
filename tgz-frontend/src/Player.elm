@@ -1,6 +1,15 @@
 module Player exposing (listPlayers, renderPlayer)
 
-import ApiTypes exposing (Empire(..), God(..), Player, Specialist(..))
+import ApiTypes
+    exposing
+        ( Craftsman(..)
+        , Empire(..)
+        , God(..)
+        , Player
+        , Specialist(..)
+        , TechnologyCard
+        , TechnologyCardState
+        )
 import Html
     exposing
         ( Attribute
@@ -53,7 +62,56 @@ renderPlayer isCurrentPlayer player =
         [ renderPlayerInfo isCurrentPlayer player
         , renderGod player
         , renderSpecialists player
+        , renderTechnologyCards player
         ]
+
+
+renderTechnologyCards : Player -> Html Msg
+renderTechnologyCards player =
+    div
+        segmentAttrs
+        ([ div [ style "text-align" "center" ] [ text "technologies" ] ]
+            ++ List.map renderTechnologyCard player.technologyCards
+        )
+
+
+renderTechnologyCard : ( TechnologyCard, TechnologyCardState ) -> Html Msg
+renderTechnologyCard ( card, state ) =
+    div
+        []
+        [ text <|
+            showCraftsman card.craftsmanType
+                ++ ": "
+                ++ String.fromInt state.price
+                ++ " ("
+                ++ String.fromInt state.cattle
+                ++ ")"
+        ]
+
+
+showCraftsman : Craftsman -> String
+showCraftsman craftsman =
+    case craftsman of
+        Potter ->
+            "potter"
+
+        IvoryCarver ->
+            "ivory-carver"
+
+        WoodCarver ->
+            "wood-carver"
+
+        DiamondCutter ->
+            "diamond-cutter"
+
+        VesselMaker ->
+            "vessel-maker"
+
+        ThroneMaker ->
+            "throne-maker"
+
+        Sculptor ->
+            "sculptor"
 
 
 renderGod player =
@@ -129,10 +187,7 @@ renderGodDescription mGod =
             in
             div
                 []
-                [ p
-                    []
-                    [ text godDescription ]
-                ]
+                [ text godDescription ]
 
 
 showGod god =
@@ -202,7 +257,7 @@ renderCattle player =
     div
         []
         [ span [] [ text "🐄: " ]
-        , span [] [ text (String.fromInt player.cattle) ]
+        , span [] [ b [] [ text (String.fromInt player.cattle) ] ]
         ]
 
 
@@ -215,7 +270,7 @@ renderUsername isCurrentPlayer player =
         playerEmpire =
             case player.empire of
                 Nothing ->
-                    "N/A"
+                    "—"
 
                 Just empire ->
                     ApiTypes.showEmpire empire
@@ -223,21 +278,22 @@ renderUsername isCurrentPlayer player =
         ( primary, secondary ) =
             empireColors player.empire
 
-        info =
-            case ( isCurrentPlayer, player.empire ) of
-                ( True, Just empire ) ->
-                    " (" ++ ApiTypes.showEmpire empire ++ ", current)"
+        boldIf pred html =
+            if pred then
+                b [] [ html ]
 
-                ( False, Just empire ) ->
+            else
+                html
+
+        info =
+            case player.empire of
+                Just empire ->
                     " (" ++ ApiTypes.showEmpire empire ++ ")"
 
-                ( True, Nothing ) ->
-                    " (current)"
-
-                ( False, Nothing ) ->
-                    ""
+                Nothing ->
+                    "—"
     in
-    div []
+    div [ style "text-align" "center" ]
         [ span
             [ style "color" primary
             , style "font-size" "30px"
@@ -246,8 +302,11 @@ renderUsername isCurrentPlayer player =
             , style "text-shadow" "-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black"
             ]
             [ b [] [ text "■" ] ]
-        , span [ style "padding-left" "10px" ] [ text player.info.username ]
-        , span [] [ text info ]
+        , span
+            [ style "padding-left" "10px" ]
+            [ boldIf isCurrentPlayer (text player.info.username)
+            ]
+        , span [] [ boldIf isCurrentPlayer (text info) ]
         ]
 
 

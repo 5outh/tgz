@@ -15,6 +15,8 @@ module ApiTypes exposing
     , Rotated(..)
     , Specialist(..)
     , Square(..)
+    , TechnologyCard
+    , TechnologyCardState
     , UserView
     , arbitraryDict
     , decodeEmpire
@@ -40,6 +42,7 @@ module ApiTypes exposing
     , intDict
     , showEmpire
     , showGod
+    , showSpecialist
     )
 
 import Dict exposing (Dict)
@@ -278,14 +281,16 @@ encodeGod val =
 type alias PlayerInfo =
     { username : String
     , email : String
+    , playerId : Int
     }
 
 
 decodePlayerInfo : Decode.Decoder PlayerInfo
 decodePlayerInfo =
-    Decode.succeed (\a b -> { username = a, email = b })
+    Decode.succeed (\a b c -> { username = a, email = b, playerId = c })
         |> required "username" Decode.string
         |> required "email" Decode.string
+        |> required "player_id" Decode.int
 
 
 type Empire
@@ -714,6 +719,25 @@ type Specialist
     | Herd
     | Builder
     | Nomads
+
+
+showSpecialist : Specialist -> String
+showSpecialist specialist =
+    case specialist of
+        Shaman ->
+            "shaman"
+
+        Nomads ->
+            "nomads"
+
+        RainCeremony ->
+            "rain-ceremony"
+
+        Builder ->
+            "builder"
+
+        Herd ->
+            "herd"
 
 
 

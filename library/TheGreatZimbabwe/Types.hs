@@ -366,7 +366,7 @@ data Points = Points
 deriveBoth (unPrefix "points") ''Points
 
 instance Semigroup Points where
-  p1 <> p2 = Points (pointsPoints p1 + pointsPoints p2) (pointsStep p2)
+  p1 <> p2 = Points (pointsPoints p1 + pointsPoints p2) (max (pointsStep p1) (pointsStep p2))
 
 instance Monoid Points where
   mempty = Points 0 0
