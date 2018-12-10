@@ -80,38 +80,13 @@ renderTechnologyCard ( card, state ) =
     div
         []
         [ text <|
-            showCraftsman card.craftsmanType
+            ApiTypes.showCraftsman card.craftsmanType
                 ++ ": "
                 ++ String.fromInt state.price
                 ++ " ("
                 ++ String.fromInt state.cattle
                 ++ ")"
         ]
-
-
-showCraftsman : Craftsman -> String
-showCraftsman craftsman =
-    case craftsman of
-        Potter ->
-            "potter"
-
-        IvoryCarver ->
-            "ivory-carver"
-
-        WoodCarver ->
-            "wood-carver"
-
-        DiamondCutter ->
-            "diamond-cutter"
-
-        VesselMaker ->
-            "vessel-maker"
-
-        ThroneMaker ->
-            "throne-maker"
-
-        Sculptor ->
-            "sculptor"
 
 
 renderGod player =

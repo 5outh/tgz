@@ -40,6 +40,7 @@ module ApiTypes exposing
     , encodeUserView
     , getRotated
     , intDict
+    , showCraftsman
     , showEmpire
     , showGod
     , showSpecialist
@@ -73,6 +74,7 @@ type alias Game =
     , mapLayout : Dict Location Square
     , gods : List God
     , specialists : List Specialist
+    , technologyCards : List ( Craftsman, List TechnologyCard )
     , winner : Maybe Int
     , step : Int
     }
@@ -81,12 +83,24 @@ type alias Game =
 decodeGame : Decoder Game
 decodeGame =
     Decode.succeed
-        (\a b c d e f g -> { players = a, round = b, mapLayout = c, gods = d, specialists = e, winner = f, step = g })
+        (\a b c d e f g h ->
+            { players = a
+            , round = b
+            , mapLayout = c
+            , gods = d
+            , specialists = e
+            , technologyCards = f
+            , winner = g
+            , step = h
+            }
+        )
         |> required "players" (intDict decodePlayer)
         |> required "round" decodeRound
         |> required "map_layout" decodeMapLayout
         |> required "gods" (Decode.list decodeGod)
         |> required "specialists" (Decode.list decodeSpecialist)
+        |> required "technology_cards"
+            (decodeMap decodeCraftsman (Decode.list decodeTechnologyCard))
         |> required "winner" (Decode.nullable Decode.int)
         |> required "step" Decode.int
 
@@ -711,6 +725,31 @@ type
     | VesselMaker
     | ThroneMaker
     | Sculptor
+
+
+showCraftsman : Craftsman -> String
+showCraftsman craftsman =
+    case craftsman of
+        Potter ->
+            "potter"
+
+        IvoryCarver ->
+            "ivory-carver"
+
+        WoodCarver ->
+            "wood-carver"
+
+        DiamondCutter ->
+            "diamond-cutter"
+
+        VesselMaker ->
+            "vessel-maker"
+
+        ThroneMaker ->
+            "throne-maker"
+
+        Sculptor ->
+            "sculptor"
 
 
 type Specialist

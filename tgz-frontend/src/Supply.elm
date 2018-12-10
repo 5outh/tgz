@@ -1,4 +1,4 @@
-module Supply exposing (godDescription, renderGods, renderSupply, segmentAttrs, showGod)
+module Supply exposing (renderSupply)
 
 import ApiTypes
     exposing
@@ -47,26 +47,33 @@ renderSupply game =
         , style "padding" "3px"
         , style "margin" "3px"
         ]
-        [ renderGods game.state.gods
-        , renderSpecialists game.state.specialists
+        [ renderListPanelWith showGod "gods" game.state.gods
+        , renderListPanelWith showSpecialist "specialists" game.state.specialists
+        , renderListPanelWith showTechnologyCards "technologies" game.state.technologyCards
         ]
 
 
-renderGods gods =
-    div
-        segmentAttrs
-    <|
-        ([ div [] [ b [] [ text "gods" ] ] ]
-            ++ List.map showGod gods
+showTechnologyCards ( craftsman, cards ) =
+    div []
+        ([ div [ style "padding-top" "5px" ] [ b [] [ text (ApiTypes.showCraftsman craftsman) ] ] ]
+            ++ List.map showTechnologyCard cards
         )
 
 
-renderSpecialists specialists =
+showTechnologyCard { name, craftsmanType, victoryRequirement, victoryPoints, cost } =
+    div
+        []
+        [ span [] [ text <| "VR: " ++ String.fromInt victoryRequirement ]
+        , span [] [ text <| ", VP: " ++ String.fromInt victoryPoints ]
+        , span [] [ text <| ", cost: " ++ String.fromInt cost ]
+        ]
+
+
+renderListPanelWith show name things =
     div
         segmentAttrs
-    <|
-        ([ div [] [ b [] [ text "specialists" ] ] ]
-            ++ List.map showSpecialist specialists
+        ([ div [ style "text-align" "center" ] [ b [] [ text name ] ] ]
+            ++ List.map show things
         )
 
 
@@ -97,21 +104,24 @@ showGod god =
             ]
         ]
 
-specialistDescription specialist = case specialist of
-  Shaman ->
-      "place resource (2)"
 
-  Nomads ->
-      "ignore monument zone (2)"
+specialistDescription specialist =
+    case specialist of
+        Shaman ->
+            "place resource (2)"
 
-  RainCeremony ->
-      "place water tile (3)"
+        Nomads ->
+            "ignore monument zone (2)"
 
-  Builder ->
-      "2 craftsman cost -> card (2)"
+        RainCeremony ->
+            "place water tile (3)"
 
-  Herd ->
-      "[3x] +1 cattle (2)"
+        Builder ->
+            "2 craftsman cost -> card (2)"
+
+        Herd ->
+            "[3x] +1 cattle (2)"
+
 
 godDescription god =
     case god of
