@@ -37,8 +37,8 @@ import List
 import Msg exposing (Msg(..))
 
 
-listPlayers : Maybe String -> List Player -> Html Msg
-listPlayers mCurrentPlayerUsername players =
+listPlayers : Maybe Int -> Maybe String -> List Player -> Html Msg
+listPlayers mWinnerId mCurrentPlayerUsername players =
     div
         [ style "display" "flex"
         , style "flex-direction" "column"
@@ -47,19 +47,20 @@ listPlayers mCurrentPlayerUsername players =
         List.map
             (\player ->
                 renderPlayer
+                    mWinnerId
                     (Just player.info.username == mCurrentPlayerUsername)
                     player
             )
             players
 
 
-renderPlayer : Bool -> Player -> Html Msg
-renderPlayer isCurrentPlayer player =
+renderPlayer : Maybe Int -> Bool -> Player -> Html Msg
+renderPlayer mWinnerId isCurrentPlayer player =
     flexItem
         [ style "max-width" "800px"
         , style "display" "flex"
         ]
-        [ renderPlayerInfo isCurrentPlayer player
+        [ renderPlayerInfo mWinnerId isCurrentPlayer player
         , renderGod player
         , renderSpecialists player
         , renderTechnologyCards player
@@ -181,10 +182,10 @@ showGod god =
         ]
 
 
-renderPlayerInfo isCurrentPlayer player =
+renderPlayerInfo mWinnerId isCurrentPlayer player =
     div
         segmentAttrs
-        [ renderUsername isCurrentPlayer player
+        [ renderUsername mWinnerId isCurrentPlayer player
         , renderVP player
         , renderVR player
         , renderCattle player
@@ -205,26 +206,46 @@ segmentAttrs =
 
 renderVP player =
     div
-        []
-        [ span [] [ text "VP: " ]
-        , span [] [ b [] [ text (String.fromInt player.victoryPoints.points) ] ]
+        [ style "display" "flex" ]
+        [ div [ style "width" "40%" ]
+            [ span [] [ text "VP" ]
+            , span
+                []
+                [ node "sub"
+                    [ style "font-size" "70%" ]
+                    [ ( "", text <| "step " ++ String.fromInt player.victoryPoints.step ) ]
+                ]
+            ]
+        , div
+            [ style "width" "20%" ]
+            [ span
+                []
+                [ text (String.fromInt player.victoryPoints.points) ]
+            ]
         , span
-            []
-            [ text <| " (" ++ String.fromInt player.victoryPoints.step ++ ")" ]
-        , span
-            []
-            [ text <| " (" ++ String.fromInt (player.victoryRequirement.points - player.victoryPoints.points) ++ " to goal)" ]
+            [ style "width" "40%" ]
+            [ text <| " " ++ String.fromInt (player.victoryRequirement.points - player.victoryPoints.points) ++ " to goal" ]
         ]
 
 
 renderVR player =
     div
-        []
-        [ span [] [ text "VR: " ]
-        , span [] [ b [] [ text (String.fromInt player.victoryRequirement.points) ] ]
-        , span
-            []
-            [ text <| " (" ++ String.fromInt player.victoryRequirement.step ++ ")" ]
+        [ style "display" "flex" ]
+        [ div [ style "width" "40%" ]
+            [ span [] [ text "VR" ]
+            , span
+                []
+                [ node "sub"
+                    [ style "font-size" "70%" ]
+                    [ ( "", text <| "step " ++ String.fromInt player.victoryRequirement.step ) ]
+                ]
+            ]
+        , div
+            [ style "width" "20%" ]
+            [ span
+                []
+                [ text (String.fromInt player.victoryRequirement.points) ]
+            ]
         ]
 
 
@@ -240,8 +261,11 @@ flexItem attrs children =
     div ([ style "padding" "3px" ] ++ attrs) children
 
 
-renderUsername isCurrentPlayer player =
+renderUsername mWinnerId isCurrentPlayer player =
     let
+        isWinner =
+            mWinnerId == Just player.info.playerId
+
         playerEmpire =
             case player.empire of
                 Nothing ->
@@ -272,8 +296,6 @@ renderUsername isCurrentPlayer player =
         [ span
             [ style "color" primary
             , style "font-size" "30px"
-
-            -- TODO: this is finnicky
             , style "text-shadow" "-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black"
             ]
             [ b [] [ text "■" ] ]
@@ -282,6 +304,11 @@ renderUsername isCurrentPlayer player =
             [ boldIf isCurrentPlayer (text player.info.username)
             ]
         , span [] [ boldIf isCurrentPlayer (text info) ]
+        , if isWinner then
+            span [] [ b [] [ text " - winner" ] ]
+
+          else
+            span [] []
         ]
 
 

@@ -433,7 +433,7 @@ renderGame game controlPanel =
             div [] []
         , controlPanel
         , div []
-            [ listPlayers currentPlayerUsername (sortedPlayers game)
+            [ listPlayers game.state.winner currentPlayerUsername (sortedPlayers game)
             ]
         , if game.state.round.currentPhase == Just PreSetup then
             renderPreSetupActionBoard game

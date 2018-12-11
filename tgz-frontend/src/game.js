@@ -66,7 +66,7 @@ export function renderMapLayout(mapLayout) {
             case "Clay":
               ctx.fillRect(x, y, size, size)
               ctx.font = textSize + 'px monospace';
-              ctx.fillText('\u26F0\uFE0F', textX, textY)
+              ctx.fillText('🏺', textX, textY)
               break;
             case "Diamonds":
               ctx.fillRect(x, y, size, size)
@@ -154,13 +154,11 @@ export function overlayPlayerMonuments(monumentsAndEmpire) {
 
       ctx.fillStyle = textColor;
       ctx.font = 'bold ' + textSize + 'px monospace';
-      ctx.textAlign="center"
       // todo not sure why we need y offset
       ctx.fillText(String(monumentCount), centerX, centerY);
 
       ctx.fillStyle = textColor;
       ctx.font = 'bold ' + (textSize/1.5) + 'px monospace';
-      ctx.textAlign="center"
       ctx.fillText(locationText(location), centerX, centerY + size/4);
     }
   }
