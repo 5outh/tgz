@@ -1,4 +1,4 @@
-module Model exposing (Fetch(..), Model, Route(..), User)
+module Model exposing (Fetch(..), HomePageState, Model, Route(..), User)
 
 import ApiTypes as ApiTypes
     exposing
@@ -41,11 +41,13 @@ type Fetch err a
     | Success a
 
 
-type alias User =
-    { username : String
-    , password : String
-    , email : String
+type alias HomePageState =
+    { games : List GameView
     }
+
+
+type alias User =
+    { username : String, password : String, email : String, id : Maybe Int }
 
 
 type alias Model =
@@ -59,4 +61,5 @@ type alias Model =
     , url : Url.Url
     , user : Maybe User
     , userLoggedIn : Bool
+    , homePageState : HomePageState
     }

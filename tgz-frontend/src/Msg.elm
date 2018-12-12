@@ -20,5 +20,6 @@ type Msg
     | UpdatePassword String
     | UpdateEmail String
     | LoginUser
+    | GotLogin (Result Http.Error String)
     | SignupUser
     | GotSignup (Result Http.Error String)

@@ -228,6 +228,13 @@ postSignup user =
         Http.expectString
 
 
+postLogin user =
+    authenticatedPost
+        "http://localhost:8000/login"
+        (Http.jsonBody <| encodeUser user)
+        Http.expectString
+
+
 getGame user gameId =
     authenticatedGet
         user
@@ -278,6 +285,7 @@ init flags url key =
       , key = key
       , user = user
       , userLoggedIn = False
+      , homePageState = { games = [] }
       }
     , case parsedRoute of
         Nothing ->
@@ -316,7 +324,7 @@ updateEmail email model =
         newUser =
             case model.user of
                 Nothing ->
-                    { email = email, password = "", username = "" }
+                    { email = email, password = "", username = "", id = Nothing }
 
                 Just existingUser ->
                     { existingUser | email = email }
@@ -332,7 +340,7 @@ updateUsername username model =
         newUser =
             case model.user of
                 Nothing ->
-                    { username = username, password = "", email = "" }
+                    { username = username, password = "", email = "", id = Nothing }
 
                 Just existingUser ->
                     { existingUser | username = username }
@@ -348,7 +356,7 @@ updatePassword password model =
         newUser =
             case model.user of
                 Nothing ->
-                    { password = password, username = "", email = "" }
+                    { password = password, username = "", email = "", id = Nothing }
 
                 Just existingUser ->
                     { existingUser | password = password }
@@ -448,7 +456,12 @@ update msg model =
 
         -- TODO: redirect to home page (list games)
         LoginUser ->
-            ( model, Cmd.none )
+            case model.user of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just user ->
+                    ( model, Http.send GotLogin (postLogin user) )
 
         SignupUser ->
             case model.user of
@@ -465,6 +478,14 @@ update msg model =
 
                 Err err ->
                     ( { model | signupError = Just "Conflicting username or email address." }, Cmd.none )
+
+        GotLogin result ->
+            case result of
+                Ok _ ->
+                    ( { model | userLoggedIn = True }, Cmd.none )
+
+                Err err ->
+                    ( { model | signupError = Just "Login failed" }, Cmd.none )
 
 
 
