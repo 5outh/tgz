@@ -26,6 +26,7 @@ import           Database.Persist.TH
 import           Elm.Derive
 import           TheGreatZimbabwe.Aeson
 import           TheGreatZimbabwe.Database.JSONB
+import           TheGreatZimbabwe.Database.User  (UserId)
 import qualified TheGreatZimbabwe.Types          as Types
 
 -- TODO administrator id
@@ -37,6 +38,7 @@ import qualified TheGreatZimbabwe.Types          as Types
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
   Game sql=games
     name         Text
+    adminId      UserId
     initialState (JSONB Types.Game)
 |]
 
@@ -47,12 +49,12 @@ data GameView = GameView
   }
 
 toView :: Entity Game -> GameView
-toView (Entity gameId (Game _name (JSONB _state))) = GameView {..}
+toView (Entity gameId (Game _name _ (JSONB _state))) = GameView {..}
   where _id = fromIntegral $ fromSqlKey gameId
 
 deriveBoth (unPrefix "_") ''GameView
 
 -- For use for preview
 fromGameState :: Entity Game -> Types.Game -> GameView
-fromGameState (Entity gameId (Game _name _)) _state = GameView {..}
+fromGameState (Entity gameId (Game _name _adminId _)) _state = GameView {..}
   where _id = fromIntegral $ fromSqlKey gameId

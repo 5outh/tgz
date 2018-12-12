@@ -42,7 +42,7 @@ import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.NewGame
 import           TheGreatZimbabwe.Types
 import           TheGreatZimbabwe.Types.GameCommand
-import           Web.Scotty
+import           Web.Scotty                         hiding (get, post)
 import qualified Web.Scotty                         as Scotty
 
 data Signup = Signup
@@ -102,10 +102,30 @@ authorizeUser pool u p = do
     Nothing              -> False
     Just (Entity _ user) -> validatePassword p (User.userPassword user)
 
+data AuthError = UserNotFound | UserCredentialsInvalid
+  deriving (Show, Eq)
+
+-- re-checks the user
+getAuthorizedUser pool = do
+  mAuthHeader <- header "Authorization"
+  case mAuthHeader of
+    Just text -> case extractBasicAuth (B.pack (TL.unpack text)) of
+      Nothing                   -> raise "Authorzation header is malformed"
+      Just (username, password) -> do
+        mUser <- runDB pool
+          $ getBy (User.UniqueUsername (T.pack (B.unpack username)))
+        case mUser of
+          Nothing -> raise "User is missing"
+          Just user ->
+            if validatePassword password (User.userPassword (entityVal user))
+              then pure user
+              else raise "User credentials incorrect"
+
+    Nothing -> raise "Authorization header missing"
+
 routes :: ConnectionPool -> ScottyM ()
 routes pool = do
-  corsOptions "/signup"
-  Scotty.post "/signup" $ do
+  httpGet "/signup" $ do
     addHeader "Access-Control-Allow-Origin" "*"
     Signup {..} <- jsonData @Signup
     user0       <- runDB pool $ getBy (User.UniqueUsername signupUsername)
@@ -117,8 +137,7 @@ routes pool = do
         status ok200 *> json ()
 
   -- This just checks if a credentials are valid.
-  corsOptions "/login"
-  Scotty.post "/login" $ do
+  httpPost "/login" $ do
     addHeader "Access-Control-Allow-Origin" "*"
     Credentials {..} <- jsonData @Credentials
     user <- runDB pool $ getBy (User.UniqueUsername credentialsUsername)
@@ -130,17 +149,7 @@ routes pool = do
           then status ok200 *> json ()
           else status notFound404 *> json ()
 
-  -- todo: delete
-  Scotty.get "/user/:username" $ do
-    addHeader "Access-Control-Allow-Origin" "*"
-    usernameParam <- param @Text "username"
-    mUser         <- runDB pool $ getBy (User.UniqueUsername usernameParam)
-    case mUser of
-      Nothing   -> status notFound404 *> json ()
-      Just user -> json $ User.toView user
-
-  corsOptions "/game/:id"
-  Scotty.get "/game/:id" $ do
+  httpGet "/game/:id" $ do
     addHeader "Access-Control-Allow-Origin" "*"
     gameId :: Game.GameId <- toSqlKey <$> param @Int64 "id"
     mGame                 <- runDB pool $ fetchFullGameWith [] gameId
@@ -149,14 +158,13 @@ routes pool = do
       Just (Left  err          ) -> status forbidden403 *> json err
       Just (Right (_, gameView)) -> status ok200 *> json gameView
 
-  corsOptions "/game/:gameId/player/:username/command"
-
-  Scotty.post "/game/:gameId/player/:username/command" $ do
+  httpPost "/game/:gameId/player/:username/command" $ do
     addHeader "Access-Control-Allow-Origin" "*"
     gameId        <- toSqlKey . fromIntegral <$> param @Int "gameId"
     -- TODO: mkUsername
     usernameParam <- param @Text "username"
     mUser         <- runDB pool $ getBy (User.UniqueUsername usernameParam)
+
     case mUser of
       Nothing                     -> status notFound404 *> json ()
       Just user@(Entity userId _) -> do
@@ -171,9 +179,6 @@ routes pool = do
           Nothing                       -> status notFound404 *> json ()
           Just (Left  err             ) -> status forbidden403 *> json err
           Just (Right (game, gameView)) -> do
-            -- TODO:
-            -- validatePlayerOwnsCommand c
-
             let saveCommand = void $ runDB pool $ Command.insertGameCommand
                   (entityKey game)
                   (entityKey user)
@@ -184,10 +189,13 @@ routes pool = do
             when shouldSave saveCommand
             status ok200 *> json gameView
 
-  Scotty.post "/new-game" $ do
+  httpPost "/new-game" $ do
     addHeader "Access-Control-Allow-Origin" "*"
     userIds :: [User.UserId] <- map (toSqlKey . fromIntegral)
       <$> param @[Int] "userIds"
+
+    admin    <- getAuthorizedUser pool
+
     gameName <- param "name"
     users    <- runDB pool $ selectList [User.UserId <-. userIds] []
     let playerInfos = map User.toPlayerInfoWithId users
@@ -199,7 +207,7 @@ routes pool = do
         InternalError _ -> status internalServerError500 *> json gameError
       Right gameData -> do
         mSavedGameData <- runDB pool $ do
-          key <- insert (Game.Game gameName (JSONB gameData))
+          key <- insert (Game.Game gameName (entityKey admin) (JSONB gameData))
           P.getEntity key
         case mSavedGameData of
           Nothing            -> status internalServerError500 *> json ()
@@ -245,6 +253,14 @@ corsOptions name = Scotty.options name $ do
   addHeader "Access-Control-Allow-Headers" "Content-Type"
   addHeader "Access-Control-Allow-Headers" "Authorization"
   status ok200 *> text ""
+
+httpGet name act = do
+  corsOptions name
+  Scotty.get name act
+
+httpPost name act = do
+  corsOptions name
+  Scotty.get name act
 
 runDB
   :: (MonadIO m, MonadBaseControl IO m)
