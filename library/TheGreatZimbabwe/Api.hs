@@ -36,6 +36,7 @@ import           TheGreatZimbabwe
 import           TheGreatZimbabwe.Aeson
 import qualified TheGreatZimbabwe.Database.Command  as Command
 import qualified TheGreatZimbabwe.Database.Game     as Game
+import qualified TheGreatZimbabwe.Database.GameUser as GameUser
 import           TheGreatZimbabwe.Database.JSONB
 import qualified TheGreatZimbabwe.Database.User     as User
 import           TheGreatZimbabwe.Error
@@ -89,6 +90,7 @@ api = do
       runMigration User.migrateAll
       runMigration Command.migrateAll
       runMigration Game.migrateAll
+      runMigration GameUser.migrateAll
 
     liftIO $ scotty 8000 $ do
       middleware $ basicAuth (authorizeUser pool) authSettings
@@ -125,93 +127,135 @@ getAuthorizedUser pool = do
 
 routes :: ConnectionPool -> ScottyM ()
 routes pool = do
-  httpGet "/signup" $ do
-    addHeader "Access-Control-Allow-Origin" "*"
-    Signup {..} <- jsonData @Signup
-    user0       <- runDB pool $ getBy (User.UniqueUsername signupUsername)
-    case user0 of
-      Just _  -> status badRequest400 *> json ()
-      Nothing -> do
-        user <- liftIO $ User.newUser signupEmail signupUsername signupPassword
-        runDB pool $ insert user
-        status ok200 *> json ()
-
+  httpGet "/signup" (postSignup pool)
   -- This just checks if a credentials are valid.
-  httpPost "/login" $ do
-    addHeader "Access-Control-Allow-Origin" "*"
-    Credentials {..} <- jsonData @Credentials
-    user <- runDB pool $ getBy (User.UniqueUsername credentialsUsername)
-    case user of
-      Nothing -> status notFound404 *> json ()
-      Just (Entity _ user) ->
-        if validatePassword (B.pack $ T.unpack credentialsPassword)
-                            (User.userPassword user)
-          then status ok200 *> json ()
-          else status notFound404 *> json ()
+  httpPost "/login" (postLogin pool)
+  httpGet "/games/:id" $ getGame pool
+  httpPost "/games/:gameId/players/:username/commands"
+    $ postPlayerGameCommand pool
+  httpPost "/games" (postGame pool)
+  httpGet "/players/:id/games" (getPlayerGames pool)
 
-  httpGet "/game/:id" $ do
-    addHeader "Access-Control-Allow-Origin" "*"
-    gameId :: Game.GameId <- toSqlKey <$> param @Int64 "id"
-    mGame                 <- runDB pool $ fetchFullGameWith [] gameId
-    case mGame of
-      Nothing                    -> status notFound404 *> json ()
-      Just (Left  err          ) -> status forbidden403 *> json err
-      Just (Right (_, gameView)) -> status ok200 *> json gameView
+getPlayerGames pool = do
+  addHeader "Access-Control-Allow-Origin" "*"
+  Entity userId user         <- getAuthorizedUser pool
+  userIdParam :: User.UserId <- toSqlKey <$> param @Int64 "id"
+  if userIdParam /= userId
+    then status forbidden403 *> json ()
+    else do
+      games <- runDB pool $ do
+        gameUsers <- selectList [GameUser.GameUserUserId ==. userIdParam] []
+        selectList
+          [ persistIdField
+              <-. map (GameUser.gameUserGameId . entityVal) gameUsers
+          ]
+          []
+        -- for now, don't worry about hydrating the games. just returm them.
+      status ok200 *> json (map Game.toView games)
+      undefined
 
-  httpPost "/game/:gameId/player/:username/command" $ do
-    addHeader "Access-Control-Allow-Origin" "*"
-    gameId        <- toSqlKey . fromIntegral <$> param @Int "gameId"
-    -- TODO: mkUsername
-    usernameParam <- param @Text "username"
-    mUser         <- runDB pool $ getBy (User.UniqueUsername usernameParam)
+postSignup pool = do
+  addHeader "Access-Control-Allow-Origin" "*"
+  Signup {..} <- jsonData @Signup
+  user0       <- runDB pool $ getBy (User.UniqueUsername signupUsername)
+  case user0 of
+    Just _  -> status badRequest400 *> json ()
+    Nothing -> do
+      user <- liftIO $ User.newUser signupEmail signupUsername signupPassword
+      runDB pool $ insert user
+      status ok200 *> json ()
 
-    case mUser of
-      Nothing                     -> status notFound404 *> json ()
-      Just user@(Entity userId _) -> do
-        preview <- flag "preview"
-        command <- jsonData @GameCommand
-        now     <- liftIO getCurrentTime
+postLogin pool = do
+  addHeader "Access-Control-Allow-Origin" "*"
+  Credentials {..} <- jsonData @Credentials
+  user <- runDB pool $ getBy (User.UniqueUsername credentialsUsername)
+  case user of
+    Nothing -> status notFound404 *> json ()
+    Just (Entity _ user) ->
+      if validatePassword (B.pack $ T.unpack credentialsPassword)
+                          (User.userPassword user)
+        then status ok200 *> json ()
+        else status notFound404 *> json ()
 
-        mGame   <- runDB pool
-          $ fetchFullGameWith [(User.toPlayerId userId, command)] gameId
 
-        case mGame of
-          Nothing                       -> status notFound404 *> json ()
-          Just (Left  err             ) -> status forbidden403 *> json err
-          Just (Right (game, gameView)) -> do
-            let saveCommand = void $ runDB pool $ Command.insertGameCommand
-                  (entityKey game)
-                  (entityKey user)
-                  now
-                  command
-                shouldSave = not preview
+getGame pool = do
+  addHeader "Access-Control-Allow-Origin" "*"
+  gameId :: Game.GameId <- toSqlKey <$> param @Int64 "id"
+  mGame                 <- runDB pool $ fetchFullGameWith [] gameId
+  case mGame of
+    Nothing                    -> status notFound404 *> json ()
+    Just (Left  err          ) -> status forbidden403 *> json err
+    Just (Right (_, gameView)) -> status ok200 *> json gameView
 
-            when shouldSave saveCommand
-            status ok200 *> json gameView
+postPlayerGameCommand pool = do
+  addHeader "Access-Control-Allow-Origin" "*"
+  gameId        <- toSqlKey . fromIntegral <$> param @Int "gameId"
+  -- TODO: mkUsername
+  usernameParam <- param @Text "username"
+  mUser         <- runDB pool $ getBy (User.UniqueUsername usernameParam)
 
-  httpPost "/new-game" $ do
-    addHeader "Access-Control-Allow-Origin" "*"
-    userIds :: [User.UserId] <- map (toSqlKey . fromIntegral)
-      <$> param @[Int] "userIds"
+  case mUser of
+    Nothing                     -> status notFound404 *> json ()
+    Just user@(Entity userId _) -> do
+      preview <- flag "preview"
+      command <- jsonData @GameCommand
+      now     <- liftIO getCurrentTime
 
-    admin    <- getAuthorizedUser pool
+      mGame   <- runDB pool
+        $ fetchFullGameWith [(User.toPlayerId userId, command)] gameId
 
-    gameName <- param "name"
-    users    <- runDB pool $ selectList [User.UserId <-. userIds] []
-    let playerInfos = map User.toPlayerInfoWithId users
-    eGameData <- getGameEvent <$> liftIO (newGame playerInfos)
-    case eGameData of
-      Left gameError -> case gameError of
-        InvalidAction _ -> do
-          status forbidden403 *> json gameError
-        InternalError _ -> status internalServerError500 *> json gameError
-      Right gameData -> do
-        mSavedGameData <- runDB pool $ do
-          key <- insert (Game.Game gameName (entityKey admin) (JSONB gameData))
-          P.getEntity key
-        case mSavedGameData of
-          Nothing            -> status internalServerError500 *> json ()
-          Just savedGameData -> json (Game.toView savedGameData)
+      case mGame of
+        Nothing                       -> status notFound404 *> json ()
+        Just (Left  err             ) -> status forbidden403 *> json err
+        Just (Right (game, gameView)) -> do
+          let saveCommand = void $ runDB pool $ Command.insertGameCommand
+                (entityKey game)
+                (entityKey user)
+                now
+                command
+              shouldSave = not preview
+
+          when shouldSave saveCommand
+          status ok200 *> json gameView
+
+data PostGame = PostGame
+  { postGameUsernames :: [Text]
+  } deriving (Generic)
+
+instance FromJSON PostGame where
+  parseJSON = genericParseJSON (unPrefix "postGame")
+
+postGame pool = do
+  addHeader "Access-Control-Allow-Origin" "*"
+
+  PostGame {..} <- jsonData @PostGame
+
+  admin         <- getAuthorizedUser pool
+
+  gameName      <- param "name"
+  users <- runDB pool $ selectList [User.UserUsername <-. postGameUsernames] []
+
+  let playerInfos = map User.toPlayerInfoWithId users
+  eGameData <- getGameEvent <$> liftIO (newGame playerInfos)
+  case eGameData of
+    Left gameError -> case gameError of
+      InvalidAction _ -> do
+        status forbidden403 *> json gameError
+      InternalError _ -> status internalServerError500 *> json gameError
+    Right gameData -> do
+      mSavedGameData <- runDB pool $ do
+        key <- insert (Game.Game gameName (entityKey admin) (JSONB gameData))
+        P.getEntity key
+      case mSavedGameData of
+        Nothing            -> status internalServerError500 *> json ()
+        Just savedGameData -> do
+          -- Associate each user with the game in question
+          void
+            $ runDB pool
+            $ insertMany
+            $ flip map (map entityKey users)
+            $ \userId -> GameUser.GameUser (entityKey savedGameData) userId
+          json (Game.toView savedGameData)
 
 flag :: TL.Text -> ActionM Bool
 flag paramName = do
