@@ -30,6 +30,7 @@ import ApiTypes as ApiTypes
         , getRotated
         , showEmpire
         )
+import Base64
 import Browser
 import Browser.Navigation as Nav
 import Canvas
@@ -189,6 +190,12 @@ routes =
 ---- MODEL ----
 
 
+type alias User =
+    { username : String
+    , password : String
+    }
+
+
 type alias Model =
     { game : Fetch Http.Error GameView
     , gameView : Maybe GameView
@@ -197,13 +204,29 @@ type alias Model =
     , route : Maybe Route
     , key : Nav.Key
     , url : Url.Url
+    , user : Maybe User
     }
 
 
-getGame gameId =
-    Http.get
+authenticatedGet { username, password } url expect =
+    Http.request
+        { method = "GET"
+        , headers =
+            [ Http.header "Authorization" ("Basic " ++ Base64.encode (username ++ ":" ++ password))
+            ]
+        , url = url
+        , expect = expect
+        , body = Http.emptyBody
+        , timeout = Nothing
+        , withCredentials = False
+        }
+
+
+getGame user gameId =
+    authenticatedGet
+        user
         ("http://localhost:8000/game/" ++ String.fromInt gameId)
-        decodeGameView
+        (Http.expectJson decodeGameView)
 
 
 issueCommand gameId username command =
@@ -235,6 +258,9 @@ init flags url key =
     let
         parsedRoute =
             parse routes url
+
+        user =
+            Just exampleUser
     in
     ( { game = Loading
       , gameView = Nothing
@@ -243,17 +269,34 @@ init flags url key =
       , route = parsedRoute
       , url = url
       , key = key
+      , user = user
       }
     , case parsedRoute of
         Nothing ->
             Cmd.none
 
+        -- TODO: If we pull the user out of localstorage, there should be
+        -- another layer of indirection here.
         Just (Game gameId) ->
-            Http.send GotGame (getGame gameId)
+            case user of
+                Nothing ->
+                    Cmd.none
+
+                Just u ->
+                    Http.send GotGame (getGame u gameId)
 
         Just (GamePlayer gameId playerId) ->
-            Http.send GotGame (getGame gameId)
+            case user of
+                Nothing ->
+                    Cmd.none
+
+                Just u ->
+                    Http.send GotGame (getGame u gameId)
     )
+
+
+exampleUser =
+    { username = "user", password = "password" }
 
 
 

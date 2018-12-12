@@ -35,6 +35,8 @@ dependencies:
   - monad-control
   - wai
   - elm-bridge
+  - wai-extra
+  - securemem
 
 library:
   source-dirs: library

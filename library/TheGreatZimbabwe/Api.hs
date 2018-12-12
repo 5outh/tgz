@@ -13,6 +13,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import           Data.Bifunctor                     (first)
 import           Data.Pool
+import           Data.SecureMem
 import           Data.Text                          (Text)
 import qualified Data.Text.Lazy                     as TL
 import           Data.Time.Clock                    (getCurrentTime)
@@ -20,6 +21,8 @@ import           Database.Persist.Postgresql
 import qualified Database.Persist.Postgresql        as P
 import           GHC.Int                            (Int64)
 import           Network.HTTP.Types.Status
+import           Network.Wai                        (requestMethod)
+import           Network.Wai.Middleware.HttpAuth
 import           TheGreatZimbabwe
 import qualified TheGreatZimbabwe.Database.Command  as Command
 import qualified TheGreatZimbabwe.Database.Game     as Game
@@ -36,6 +39,10 @@ import qualified Web.Scotty                         as Scotty
 devString :: ConnectionString
 devString = "host=localhost dbname=tgz_dev user=bendotk port=5432"
 
+authSettings :: AuthSettings
+authSettings =
+  "TGZ" { authIsProtected = \req -> pure (requestMethod req /= "OPTIONS") }
+
 api :: IO ()
 api = do
   runStdoutLoggingT $ withPostgresqlPool devString 10 $ \pool -> do
@@ -44,7 +51,16 @@ api = do
       runMigration Command.migrateAll
       runMigration Game.migrateAll
 
-    liftIO $ scotty 8000 (routes pool)
+    liftIO $ scotty 8000 $ do
+
+      middleware $ basicAuth
+        (\u p -> return $ u == "user" && secureMemFromByteString p == password)
+        authSettings
+
+      routes pool
+
+password :: SecureMem
+password = secureMemFromByteString "password" -- https://xkcd.com/221/
 
 routes :: ConnectionPool -> ScottyM ()
 routes pool = do
@@ -56,6 +72,8 @@ routes pool = do
       Nothing   -> status notFound404 *> json ()
       Just user -> json $ User.toView user
 
+  corsOptions "/game/:id"
+
   Scotty.get "/game/:id" $ do
     addHeader "Access-Control-Allow-Origin" "*"
     gameId :: Game.GameId <- toSqlKey <$> param @Int64 "id"
@@ -65,10 +83,7 @@ routes pool = do
       Just (Left  err          ) -> status forbidden403 *> json err
       Just (Right (_, gameView)) -> status ok200 *> json gameView
 
-  Scotty.options "/game/:gameId/player/:username/command" $ do
-    addHeader "Access-Control-Allow-Origin"  "*"
-    addHeader "Access-Control-Allow-Headers" "Content-Type"
-    status ok200 *> text ""
+  corsOptions "/game/:gameId/player/:username/command"
 
   Scotty.post "/game/:gameId/player/:username/command" $ do
     addHeader "Access-Control-Allow-Origin" "*"
@@ -158,6 +173,12 @@ fetchFullGameWith cmds gameId = do
       pure $ Just $ case eGameState of
         Left  gameError -> Left gameError
         Right gameState -> Right (game, Game.fromGameState game gameState)
+
+corsOptions name = Scotty.options name $ do
+  addHeader "Access-Control-Allow-Origin"  "*"
+  addHeader "Access-Control-Allow-Headers" "Content-Type"
+  addHeader "Access-Control-Allow-Headers" "Authorization"
+  status ok200 *> text ""
 
 runDB
   :: (MonadIO m, MonadBaseControl IO m)
