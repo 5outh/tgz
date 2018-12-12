@@ -451,6 +451,7 @@ update msg model =
         UpdateEmail email ->
             ( updateEmail email model, Cmd.none )
 
+        -- TODO: redirect to home page (list games)
         LoginUser ->
             ( model, Cmd.none )
 
@@ -510,7 +511,7 @@ view model =
     Browser.Document "The Great Zimbabwe" <|
         case model.route of
             Just Login ->
-                [ loginPage ]
+                [ loginPage model ]
 
             Nothing ->
                 [ text "Not Found" ]
