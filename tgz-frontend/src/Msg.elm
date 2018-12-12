@@ -16,3 +16,6 @@ type Msg
     | PreviewGameCommand GameCommand
     | UpdateCommand String
     | MapLayoutRendered
+    | UpdateUsername String
+    | UpdatePassword String
+    | LoginUser

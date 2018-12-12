@@ -1,7 +1,5 @@
 module Main exposing
-    ( Fetch(..)
-    , Model
-    , getGame
+    ( getGame
     , init
     , main
     , update
@@ -65,7 +63,9 @@ import Http
 import Json.Decode as Json
 import Json.Encode as E
 import Layout
+import Model exposing (..)
 import Msg exposing (Msg(..))
+import Page.Login exposing (loginPage)
 import Parser
 import Player exposing (..)
 import Ports
@@ -173,39 +173,17 @@ overlayUsedMarkers usedMarkers =
 ---- ROUTING ----
 
 
-type Route
-    = Game Int
-    | GamePlayer Int String
-
-
 routes : Parser (Route -> a) a
 routes =
     oneOf
         [ map Game (s "game" </> int)
         , map GamePlayer (s "game" </> int </> s "username" </> string)
+        , map Login (s "login")
         ]
 
 
 
 ---- MODEL ----
-
-
-type alias User =
-    { username : String
-    , password : String
-    }
-
-
-type alias Model =
-    { game : Fetch Http.Error GameView
-    , gameView : Maybe GameView
-    , gameError : Maybe GameError
-    , playerCommand : ( String, Maybe GameCommand )
-    , route : Maybe Route
-    , key : Nav.Key
-    , url : Url.Url
-    , user : Maybe User
-    }
 
 
 authenticatedGet { username, password } url expect =
@@ -270,6 +248,7 @@ init flags url key =
       , url = url
       , key = key
       , user = user
+      , userLoggedIn = False
       }
     , case parsedRoute of
         Nothing ->
@@ -292,6 +271,9 @@ init flags url key =
 
                 Just u ->
                     Http.send GotGame (getGame u gameId)
+
+        Just Login ->
+            Cmd.none
     )
 
 
@@ -303,10 +285,36 @@ exampleUser =
 ---- UPDATE ----
 
 
-type Fetch err a
-    = Failure err
-    | Loading
-    | Success a
+updateUsername username model =
+    let
+        currentUser =
+            model.user
+
+        newUser =
+            case model.user of
+                Nothing ->
+                    { username = username, password = "" }
+
+                Just existingUser ->
+                    { existingUser | username = username }
+    in
+    { model | user = Just newUser }
+
+
+updatePassword password model =
+    let
+        currentUser =
+            model.user
+
+        newUser =
+            case model.user of
+                Nothing ->
+                    { password = password, username = "" }
+
+                Just existingUser ->
+                    { existingUser | password = password }
+    in
+    { model | user = Just newUser }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -390,6 +398,15 @@ update msg model =
                 Err _ ->
                     ( { model | playerCommand = ( commandString, Nothing ) }, Cmd.none )
 
+        UpdateUsername username ->
+            ( updateUsername username model, Cmd.none )
+
+        UpdatePassword password ->
+            ( updateUsername password model, Cmd.none )
+
+        LoginUser ->
+            ( model, Cmd.none )
+
 
 
 ---- VIEW ----
@@ -427,7 +444,16 @@ view model =
                 _ ->
                     emptyDiv "Loading..."
     in
-    Browser.Document "The Great Zimbabwe" [ loadingDiv, gameDiv ]
+    Browser.Document "The Great Zimbabwe" <|
+        case model.route of
+            Just Login ->
+                [ loginPage ]
+
+            Nothing ->
+                [ text "Not Found" ]
+
+            _ ->
+                [ loadingDiv, gameDiv ]
 
 
 trace val =
