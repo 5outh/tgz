@@ -374,20 +374,6 @@ view model =
                 _ ->
                     div [] []
 
-        errorDiv =
-            case model.gameError of
-                Nothing ->
-                    div [] []
-
-                Just gameError ->
-                    case gameError of
-                        InternalError message ->
-                            div []
-                                [ text ("Server Error (not your fault!) " ++ message) ]
-
-                        InvalidAction message ->
-                            div [] [ text message ]
-
         -- NOTE: This is extremely finnicky. Be careful modifying this, or
         -- the game may completely disappear from the screen.
         gameDiv =
@@ -398,7 +384,7 @@ view model =
                 _ ->
                     emptyDiv "Loading..."
     in
-    Browser.Document "The Great Zimbabwe" [ loadingDiv, errorDiv, gameDiv ]
+    Browser.Document "The Great Zimbabwe" [ loadingDiv, gameDiv ]
 
 
 trace val =
@@ -463,6 +449,20 @@ sortedPlayers game =
 renderControlPanel : Model -> Html Msg
 renderControlPanel model =
     let
+        errorDiv =
+            case model.gameError of
+                Nothing ->
+                    div [] []
+
+                Just gameError ->
+                    case gameError of
+                        InternalError message ->
+                            div []
+                                [ text ("Server Error (not your fault!) " ++ message) ]
+
+                        InvalidAction message ->
+                            div [] [ text message ]
+
         parsedCommand =
             second model.playerCommand
 
@@ -483,7 +483,8 @@ renderControlPanel model =
                     PreviewGameCommand gameCommand
     in
     div []
-        [ textarea
+        [ errorDiv
+        , textarea
             [ placeholder "Enter command"
             , value (first model.playerCommand)
             , onInput UpdateCommand
@@ -491,8 +492,19 @@ renderControlPanel model =
             , style "min-height" "100px"
             ]
             []
-        , div [] [ button [ onClick (previewCommandIfPossible parsedCommand) ] [ text "Preview" ] ]
-        , div [] [ button [ onClick (issueCommandIfPossible parsedCommand) ] [ text "Submit" ] ]
+        , div []
+            [ span [ style "padding" "10px" ]
+                [ button
+                    [ onClick (previewCommandIfPossible parsedCommand) ]
+                    [ text "Preview" ]
+                ]
+            , span
+                [ style "padding" "10px" ]
+                [ button
+                    [ onClick (issueCommandIfPossible parsedCommand) ]
+                    [ text "Submit" ]
+                ]
+            ]
         , div [] [ text <| Debug.toString parsedCommand ]
         ]
 

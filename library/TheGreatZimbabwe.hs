@@ -99,7 +99,9 @@ handleFinishReligionAndCulture game = do
       players <- getPlayers game
       let mWinner = determineWinner players
       case mWinner of
-        Just _  -> pure $ (game & winner .~ mWinner)
+        Just _ ->
+          pure
+            $ (game & set winner mWinner & set (round . currentPhase) Nothing)
         Nothing -> do
           -- if nobody has won...
           playerIds <- for players $ \player -> case playerInfo player of
