@@ -18,4 +18,7 @@ type Msg
     | MapLayoutRendered
     | UpdateUsername String
     | UpdatePassword String
+    | UpdateEmail String
     | LoginUser
+    | SignupUser
+    | GotSignup (Result Http.Error String)

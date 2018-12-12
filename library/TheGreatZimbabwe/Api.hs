@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -11,19 +12,28 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
+import           Crypto.KDF.BCrypt                  (hashPassword,
+                                                     validatePassword)
+import           Data.Aeson                         (FromJSON (..),
+                                                     genericParseJSON)
 import           Data.Bifunctor                     (first)
+import           Data.ByteString                    (ByteString)
+import qualified Data.ByteString.Char8              as B
 import           Data.Pool
-import           Data.SecureMem
 import           Data.Text                          (Text)
+import qualified Data.Text                          as T
 import qualified Data.Text.Lazy                     as TL
 import           Data.Time.Clock                    (getCurrentTime)
 import           Database.Persist.Postgresql
 import qualified Database.Persist.Postgresql        as P
+import           Debug.Trace
+import           GHC.Generics
 import           GHC.Int                            (Int64)
 import           Network.HTTP.Types.Status
-import           Network.Wai                        (requestMethod)
+import           Network.Wai                        (pathInfo, requestMethod)
 import           Network.Wai.Middleware.HttpAuth
 import           TheGreatZimbabwe
+import           TheGreatZimbabwe.Aeson
 import qualified TheGreatZimbabwe.Database.Command  as Command
 import qualified TheGreatZimbabwe.Database.Game     as Game
 import           TheGreatZimbabwe.Database.JSONB
@@ -35,13 +45,42 @@ import           TheGreatZimbabwe.Types.GameCommand
 import           Web.Scotty
 import qualified Web.Scotty                         as Scotty
 
+data Signup = Signup
+  { signupUsername :: Text
+  , signupPassword :: Text
+  , signupEmail    :: Text
+  } deriving (Generic)
+
+instance FromJSON Signup where
+  parseJSON = genericParseJSON (unPrefix "signup")
+
+data Credentials = Credentials
+  { credentialsUsername :: Text
+  , credentialsPassword :: Text
+  } deriving (Generic)
+
+instance FromJSON Credentials where
+  parseJSON = genericParseJSON (unPrefix "credentials")
+
 -- TODO: Environment Variables
 devString :: ConnectionString
 devString = "host=localhost dbname=tgz_dev user=bendotk port=5432"
 
+
+-- TODO: allow hitting /login and /signup with 'pathInfo'
 authSettings :: AuthSettings
-authSettings =
-  "TGZ" { authIsProtected = \req -> pure (requestMethod req /= "OPTIONS") }
+authSettings = "TGZ"
+  { authIsProtected = \req -> do
+                        let isWhitelisted =
+                              pathInfo req
+                                == ["login"]
+                                || pathInfo req
+                                == ["signup"]
+                                || requestMethod req
+                                == "OPTIONS"
+
+                        pure (not isWhitelisted)
+  }
 
 api :: IO ()
 api = do
@@ -52,18 +91,46 @@ api = do
       runMigration Game.migrateAll
 
     liftIO $ scotty 8000 $ do
-
-      middleware $ basicAuth
-        (\u p -> return $ u == "user" && secureMemFromByteString p == password)
-        authSettings
+      middleware $ basicAuth (authorizeUser pool) authSettings
 
       routes pool
 
-password :: SecureMem
-password = secureMemFromByteString "password" -- https://xkcd.com/221/
+authorizeUser :: ConnectionPool -> ByteString -> ByteString -> IO Bool
+authorizeUser pool u p = do
+  mUser <- runDB pool $ getBy (User.UniqueUsername (T.pack $ B.unpack u))
+  pure $ case mUser of
+    Nothing              -> False
+    Just (Entity _ user) -> validatePassword p (User.userPassword user)
 
 routes :: ConnectionPool -> ScottyM ()
 routes pool = do
+  corsOptions "/signup"
+  Scotty.post "/signup" $ do
+    addHeader "Access-Control-Allow-Origin" "*"
+    Signup {..} <- jsonData @Signup
+    user0       <- runDB pool $ getBy (User.UniqueUsername signupUsername)
+    case user0 of
+      Just _  -> status badRequest400 *> json ()
+      Nothing -> do
+        user <- liftIO $ User.newUser signupEmail signupUsername signupPassword
+        runDB pool $ insert user
+        status ok200 *> json ()
+
+  -- This just checks if a credentials are valid.
+  corsOptions "/login"
+  Scotty.post "/login" $ do
+    addHeader "Access-Control-Allow-Origin" "*"
+    Credentials {..} <- jsonData @Credentials
+    user <- runDB pool $ getBy (User.UniqueUsername credentialsUsername)
+    case user of
+      Nothing -> status notFound404 *> json ()
+      Just (Entity _ user) ->
+        if validatePassword (B.pack $ T.unpack credentialsPassword)
+                            (User.userPassword user)
+          then status ok200 *> json ()
+          else status notFound404 *> json ()
+
+  -- todo: delete
   Scotty.get "/user/:username" $ do
     addHeader "Access-Control-Allow-Origin" "*"
     usernameParam <- param @Text "username"
@@ -73,7 +140,6 @@ routes pool = do
       Just user -> json $ User.toView user
 
   corsOptions "/game/:id"
-
   Scotty.get "/game/:id" $ do
     addHeader "Access-Control-Allow-Origin" "*"
     gameId :: Game.GameId <- toSqlKey <$> param @Int64 "id"

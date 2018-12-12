@@ -12,7 +12,12 @@
 
 module TheGreatZimbabwe.Database.User where
 
+import           Crypto.KDF.BCrypt           (hashPassword, validatePassword)
+import           Data.ByteString
+import qualified Data.ByteString.Char8       as B
+import           Data.SecureMem
 import           Data.Text                   (Text)
+import qualified Data.Text                   as T
 import           Database.Persist
 import           Database.Persist.Postgresql
 import           Database.Persist.TH
@@ -24,8 +29,9 @@ import           TheGreatZimbabwe.Types
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
   User sql=users
-    username  Text
     email     Text
+    username  Text
+    password  ByteString
     UniqueEmail email
     UniqueUsername username
 |]
@@ -58,3 +64,12 @@ toView (Entity userId (User {..})) = UserView {..}
   _email    = userEmail
 
 deriveBoth (unPrefix "_") ''UserView
+
+newUser :: Text -> Text -> Text -> IO User
+newUser email username password = do
+  hashedPassword <- hashPassword 12 (B.pack $ T.unpack password)
+  pure $ User
+    { userEmail    = email
+    , userUsername = username
+    , userPassword = hashedPassword
+    }

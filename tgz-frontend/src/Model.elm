@@ -44,6 +44,7 @@ type Fetch err a
 type alias User =
     { username : String
     , password : String
+    , email : String
     }
 
 
@@ -51,6 +52,7 @@ type alias Model =
     { game : Fetch Http.Error GameView
     , gameView : Maybe GameView
     , gameError : Maybe GameError
+    , signupError : Maybe String
     , playerCommand : ( String, Maybe GameCommand )
     , route : Maybe Route
     , key : Nav.Key

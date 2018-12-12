@@ -37,6 +37,7 @@ dependencies:
   - elm-bridge
   - wai-extra
   - securemem
+  - cryptonite
 
 library:
   source-dirs: library

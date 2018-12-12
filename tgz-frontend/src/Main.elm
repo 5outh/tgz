@@ -81,6 +81,20 @@ onKeyUp tagger =
     on "keyup" (Json.map tagger keyCode)
 
 
+encodeUser : User -> E.Value
+encodeUser { email, username, password } =
+    E.object <|
+        [ ( "username", E.string username )
+        , ( "password", E.string password )
+        ]
+            ++ (if email == "" then
+                    []
+
+                else
+                    [ ( "email", E.string email ) ]
+               )
+
+
 
 -- Encode a player for use with map overlay
 
@@ -200,6 +214,25 @@ authenticatedGet { username, password } url expect =
         }
 
 
+authenticatedPost url body expect =
+    Http.request
+        { method = "POST"
+        , headers = []
+        , url = url
+        , expect = expect
+        , body = body
+        , timeout = Nothing
+        , withCredentials = False
+        }
+
+
+postSignup user =
+    authenticatedPost
+        "http://localhost:8000/signup"
+        (Http.jsonBody <| encodeUser user)
+        Http.expectString
+
+
 getGame user gameId =
     authenticatedGet
         user
@@ -238,11 +271,12 @@ init flags url key =
             parse routes url
 
         user =
-            Just exampleUser
+            Nothing
     in
     ( { game = Loading
       , gameView = Nothing
       , gameError = Nothing
+      , signupError = Nothing
       , playerCommand = ( "", Nothing )
       , route = parsedRoute
       , url = url
@@ -254,8 +288,6 @@ init flags url key =
         Nothing ->
             Cmd.none
 
-        -- TODO: If we pull the user out of localstorage, there should be
-        -- another layer of indirection here.
         Just (Game gameId) ->
             case user of
                 Nothing ->
@@ -277,12 +309,24 @@ init flags url key =
     )
 
 
-exampleUser =
-    { username = "user", password = "password" }
-
-
 
 ---- UPDATE ----
+
+
+updateEmail email model =
+    let
+        currentUser =
+            model.user
+
+        newUser =
+            case model.user of
+                Nothing ->
+                    { email = email, password = "", username = "" }
+
+                Just existingUser ->
+                    { existingUser | email = email }
+    in
+    { model | user = Just newUser }
 
 
 updateUsername username model =
@@ -293,7 +337,7 @@ updateUsername username model =
         newUser =
             case model.user of
                 Nothing ->
-                    { username = username, password = "" }
+                    { username = username, password = "", email = "" }
 
                 Just existingUser ->
                     { existingUser | username = username }
@@ -309,7 +353,7 @@ updatePassword password model =
         newUser =
             case model.user of
                 Nothing ->
-                    { password = password, username = "" }
+                    { password = password, username = "", email = "" }
 
                 Just existingUser ->
                     { existingUser | password = password }
@@ -402,10 +446,29 @@ update msg model =
             ( updateUsername username model, Cmd.none )
 
         UpdatePassword password ->
-            ( updateUsername password model, Cmd.none )
+            ( updatePassword password model, Cmd.none )
+
+        UpdateEmail email ->
+            ( updateEmail email model, Cmd.none )
 
         LoginUser ->
             ( model, Cmd.none )
+
+        SignupUser ->
+            case model.user of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just user ->
+                    ( model, Http.send GotSignup (postSignup user) )
+
+        GotSignup result ->
+            case result of
+                Ok _ ->
+                    ( { model | userLoggedIn = True }, Cmd.none )
+
+                Err err ->
+                    ( { model | signupError = Just "Conflicting username or email address." }, Cmd.none )
 
 
 

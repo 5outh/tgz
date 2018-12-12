@@ -32,6 +32,9 @@ loginPage =
         []
         [ h3 [] [ text "Login to tgz [alpha]" ]
         , loginForm
+        , div [] [ text "or" ]
+        , h3 [] [ text "Signup for tgz [alpha]" ]
+        , signupForm
         ]
 
 
@@ -42,4 +45,16 @@ loginForm =
         , label [ for "password", minlength 8, maxlength 32 ] [ text "password" ]
         , div [ name "password" ] [ input [ type_ "password", onInput UpdatePassword ] [] ]
         , button [ onClick LoginUser ] [ text "login" ]
+        ]
+
+
+signupForm =
+    div []
+        [ label [ for "email", minlength 3, maxlength 32 ] [ text "email" ]
+        , div [ name "email" ] [ input [ type_ "text", onInput UpdateEmail ] [] ]
+        , label [ for "username", minlength 3, maxlength 12 ] [ text "username" ]
+        , div [ name "username" ] [ input [ type_ "text", onInput UpdateUsername ] [] ]
+        , label [ for "password", minlength 8, maxlength 32 ] [ text "password" ]
+        , div [ name "password" ] [ input [ type_ "password", onInput UpdatePassword ] [] ]
+        , button [ onClick SignupUser ] [ text "signup" ]
         ]
