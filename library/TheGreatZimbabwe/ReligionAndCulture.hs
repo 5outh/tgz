@@ -496,7 +496,7 @@ reachableLocationsUsingOneHub mapGraph startingLocations game = do
     allHubLocations =
       S.fromList . M.keys . mconcat $ map playerMonuments allPlayers
     reachableHubLocations = allHubLocations `S.intersection` reachableLocations
-    reachableByOneHub     = mapConnectionsN 3 mapGraph startingLocations
+    reachableByOneHub     = mapConnectionsN 3 mapGraph reachableHubLocations
 
   pure $ reachableByOneHub <> reachableLocations
 
