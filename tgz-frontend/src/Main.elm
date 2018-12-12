@@ -76,11 +76,6 @@ import Url
 import Url.Parser exposing ((</>), Parser, int, map, oneOf, parse, s, string)
 
 
-onKeyUp : (Int -> msg) -> Attribute msg
-onKeyUp tagger =
-    on "keyup" (Json.map tagger keyCode)
-
-
 encodeUser : User -> E.Value
 encodeUser { email, username, password } =
     E.object <|
