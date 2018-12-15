@@ -68,7 +68,6 @@ devString :: ConnectionString
 devString = "host=localhost dbname=tgz_dev user=bendotk port=5432"
 
 
--- TODO: allow hitting /login and /signup with 'pathInfo'
 authSettings :: AuthSettings
 authSettings = "TGZ"
   { authIsProtected = \req -> do
@@ -85,6 +84,7 @@ authSettings = "TGZ"
 
 api :: IO ()
 api = do
+  --connectionString :: ConnectionString <- getEnv "PG_CONN_STR"
   runStdoutLoggingT $ withPostgresqlPool devString 10 $ \pool -> do
     runDB pool $ do
       runMigration User.migrateAll
@@ -127,17 +127,27 @@ getAuthorizedUser pool = do
 
 routes :: ConnectionPool -> ScottyM ()
 routes pool = do
-  httpGet "/signup" (postSignup pool)
+  httpPost "/signup" (postSignup pool)
   -- This just checks if a credentials are valid.
-  httpPost "/login" (postLogin pool)
+  httpPost "/login"  (postLogin pool)
   httpGet "/games/:id" $ getGame pool
   httpPost "/games/:gameId/players/:username/commands"
     $ postPlayerGameCommand pool
   httpPost "/games" (postGame pool)
-  httpGet "/players/:id/games" (getPlayerGames pool)
+  httpGet "/users/:username" (getUser pool)
+  httpGet "/users/:id/games" (getUserGames pool)
 
-getPlayerGames pool = do
-  addHeader "Access-Control-Allow-Origin" "*"
+getUser pool = do
+  userEntity@(Entity userId user) <- getAuthorizedUser pool
+  usernameParam :: Text           <- param @Text "username"
+
+  if usernameParam /= (User.userUsername user)
+    then status forbidden403 *> json ()
+    else do
+      user <- getAuthorizedUser pool
+      status ok200 *> json (User.toView userEntity)
+
+getUserGames pool = do
   Entity userId user         <- getAuthorizedUser pool
   userIdParam :: User.UserId <- toSqlKey <$> param @Int64 "id"
   if userIdParam /= userId
@@ -152,10 +162,8 @@ getPlayerGames pool = do
           []
         -- for now, don't worry about hydrating the games. just returm them.
       status ok200 *> json (map Game.toView games)
-      undefined
 
 postSignup pool = do
-  addHeader "Access-Control-Allow-Origin" "*"
   Signup {..} <- jsonData @Signup
   user0       <- runDB pool $ getBy (User.UniqueUsername signupUsername)
   case user0 of
@@ -166,7 +174,6 @@ postSignup pool = do
       status ok200 *> json ()
 
 postLogin pool = do
-  addHeader "Access-Control-Allow-Origin" "*"
   Credentials {..} <- jsonData @Credentials
   user <- runDB pool $ getBy (User.UniqueUsername credentialsUsername)
   case user of
@@ -179,7 +186,6 @@ postLogin pool = do
 
 
 getGame pool = do
-  addHeader "Access-Control-Allow-Origin" "*"
   gameId :: Game.GameId <- toSqlKey <$> param @Int64 "id"
   mGame                 <- runDB pool $ fetchFullGameWith [] gameId
   case mGame of
@@ -188,7 +194,6 @@ getGame pool = do
     Just (Right (_, gameView)) -> status ok200 *> json gameView
 
 postPlayerGameCommand pool = do
-  addHeader "Access-Control-Allow-Origin" "*"
   gameId        <- toSqlKey . fromIntegral <$> param @Int "gameId"
   -- TODO: mkUsername
   usernameParam <- param @Text "username"
@@ -226,8 +231,6 @@ instance FromJSON PostGame where
   parseJSON = genericParseJSON (unPrefix "postGame")
 
 postGame pool = do
-  addHeader "Access-Control-Allow-Origin" "*"
-
   PostGame {..} <- jsonData @PostGame
 
   admin         <- getAuthorizedUser pool
@@ -292,19 +295,21 @@ fetchFullGameWith cmds gameId = do
         Left  gameError -> Left gameError
         Right gameState -> Right (game, Game.fromGameState game gameState)
 
-corsOptions name = Scotty.options name $ do
+withCors act = do
   addHeader "Access-Control-Allow-Origin"  "*"
   addHeader "Access-Control-Allow-Headers" "Content-Type"
   addHeader "Access-Control-Allow-Headers" "Authorization"
-  status ok200 *> text ""
+  act
+
+corsOptions name = Scotty.options name $ withCors (status ok200 *> text "")
 
 httpGet name act = do
   corsOptions name
-  Scotty.get name act
+  Scotty.get name $ withCors act
 
 httpPost name act = do
   corsOptions name
-  Scotty.get name act
+  Scotty.post name $ withCors act
 
 runDB
   :: (MonadIO m, MonadBaseControl IO m)

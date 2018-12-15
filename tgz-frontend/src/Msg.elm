@@ -1,6 +1,6 @@
 module Msg exposing (Msg(..))
 
-import ApiTypes exposing (GameView)
+import ApiTypes exposing (GameView, UserView)
 import Browser
 import GameCommand exposing (GameCommand(..), encodeGameCommand, parseGameCommand)
 import Http
@@ -23,3 +23,5 @@ type Msg
     | GotLogin (Result Http.Error String)
     | SignupUser
     | GotSignup (Result Http.Error String)
+    | GetUser
+    | GotUser (Result Http.Error UserView)

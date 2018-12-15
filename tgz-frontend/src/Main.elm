@@ -19,6 +19,7 @@ import ApiTypes as ApiTypes
         , Player
         , Rotated(..)
         , Specialist(..)
+        , UserView
         , decodeGameView
         , encodeCraftsman
         , encodeEmpire
@@ -60,8 +61,9 @@ import Html.Attributes exposing (height, id, placeholder, src, style, value, wid
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Html.Keyed exposing (node)
 import Http
-import Json.Decode as Json
+import Json.Decode as D
 import Json.Encode as E
+import Json.Helpers exposing (..)
 import Layout
 import Model exposing (..)
 import Msg exposing (Msg(..))
@@ -199,7 +201,8 @@ authenticatedGet { username, password } url expect =
     Http.request
         { method = "GET"
         , headers =
-            [ Http.header "Authorization" ("Basic " ++ Base64.encode (username ++ ":" ++ password))
+            [ Http.header "Authorization"
+              ("Basic " ++ Base64.encode (username ++ ":" ++ password))
             ]
         , url = url
         , expect = expect
@@ -209,7 +212,7 @@ authenticatedGet { username, password } url expect =
         }
 
 
-authenticatedPost url body expect =
+unAuthenticatedPost url body expect =
     Http.request
         { method = "POST"
         , headers = []
@@ -222,14 +225,14 @@ authenticatedPost url body expect =
 
 
 postSignup user =
-    authenticatedPost
+    unAuthenticatedPost
         "http://localhost:8000/signup"
         (Http.jsonBody <| encodeUser user)
         Http.expectString
 
 
 postLogin user =
-    authenticatedPost
+    unAuthenticatedPost
         "http://localhost:8000/login"
         (Http.jsonBody <| encodeUser user)
         Http.expectString
@@ -242,8 +245,16 @@ getGame user gameId =
         (Http.expectJson decodeGameView)
 
 
+getUser : User -> String -> Http.Request UserView
+getUser user username =
+    authenticatedGet
+        user
+        ("http://localhost:8000/users/" ++ username)
+        (Http.expectJson ApiTypes.decodeUserView)
+
+
 issueCommand gameId username command =
-    Http.post
+    unAuthenticatedPost -- TODO: Authenticate, pass user
         ("http://localhost:8000/game/"
             ++ String.fromInt gameId
             ++ "/player/"
@@ -251,7 +262,7 @@ issueCommand gameId username command =
             ++ "/command"
         )
         (Http.jsonBody (encodeGameCommand command))
-        decodeGameView
+        (Http.expectJson decodeGameView)
 
 
 previewCommand gameId username command =
@@ -314,6 +325,22 @@ init flags url key =
 
 
 ---- UPDATE ----
+
+
+updateId id model =
+    let
+        currentUser =
+            model.user
+
+        newUser =
+            case model.user of
+                Nothing ->
+                    { email = "", password = "", username = "", id = Just id }
+
+                Just existingUser ->
+                    { existingUser | id = Just id }
+    in
+    { model | user = Just newUser }
 
 
 updateEmail email model =
@@ -474,7 +501,7 @@ update msg model =
         GotSignup result ->
             case result of
                 Ok _ ->
-                    ( { model | userLoggedIn = True }, Cmd.none )
+                    ( { model | userLoggedIn = True, signupError = Nothing }, Cmd.none )
 
                 Err err ->
                     ( { model | signupError = Just "Conflicting username or email address." }, Cmd.none )
@@ -482,10 +509,42 @@ update msg model =
         GotLogin result ->
             case result of
                 Ok _ ->
-                    ( { model | userLoggedIn = True }, Cmd.none )
+                    case model.user of
+                        Nothing ->
+                            ( { model | signupError = Just "Something went wrong (user went missing)" }
+                            , Cmd.none
+                            )
+
+                        Just user ->
+                            ( { model | userLoggedIn = True, signupError = Nothing }
+                            , Http.send GotUser (getUser user user.username)
+                            )
 
                 Err err ->
                     ( { model | signupError = Just "Login failed" }, Cmd.none )
+
+        GetUser ->
+            case model.user of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just user ->
+                    ( model, Http.send GotUser (getUser user user.username) )
+
+        GotUser result ->
+            case result of
+                Ok userView ->
+                    ( updateUsername
+                        userView.username
+                      <|
+                        updateEmail userView.email <|
+                            updateId userView.id <|
+                                model
+                    , Cmd.none
+                    )
+
+                Err err ->
+                    ( { model | signupError = Just "Could not fetch user" }, Cmd.none )
 
 
 
