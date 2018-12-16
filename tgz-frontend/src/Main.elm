@@ -35,6 +35,7 @@ import Browser.Navigation as Nav
 import Canvas
 import CanvasColor as Color exposing (Color)
 import Dict
+import Extra.Cmd as ExtraCmd
 import Extra.Maybe exposing (..)
 import GameCommand exposing (GameCommand(..), encodeGameCommand, parseGameCommand)
 import GameError exposing (GameError(..), decodeGameErrorFromBadStatusResponse)
@@ -42,6 +43,7 @@ import Html
     exposing
         ( Attribute
         , Html
+        , a
         , button
         , canvas
         , div
@@ -57,7 +59,7 @@ import Html
         , textarea
         , ul
         )
-import Html.Attributes exposing (height, id, placeholder, src, style, value, width)
+import Html.Attributes exposing (height, href, id, placeholder, src, style, value, width)
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Html.Keyed exposing (node)
 import Http
@@ -66,7 +68,9 @@ import Json.Encode as E
 import Json.Helpers exposing (..)
 import Layout
 import Model exposing (..)
+import Models.User exposing (..)
 import Msg exposing (Msg(..))
+import Page.Home exposing (home)
 import Page.Login exposing (loginPage)
 import Parser
 import Player exposing (..)
@@ -75,21 +79,8 @@ import Supply exposing (renderSupply)
 import Task
 import Tuple exposing (first, second)
 import Url
+import Url.Builder as Builder
 import Url.Parser exposing ((</>), Parser, int, map, oneOf, parse, s, string)
-
-
-encodeUser : User -> E.Value
-encodeUser { email, username, password } =
-    E.object <|
-        [ ( "username", E.string username )
-        , ( "password", E.string password )
-        ]
-            ++ (if email == "" then
-                    []
-
-                else
-                    [ ( "email", E.string email ) ]
-               )
 
 
 
@@ -190,6 +181,7 @@ routes =
         [ map Game (s "game" </> int)
         , map GamePlayer (s "game" </> int </> s "username" </> string)
         , map Login (s "login")
+        , map Home (s "home" </> string)
         ]
 
 
@@ -202,7 +194,7 @@ authenticatedGet { username, password } url expect =
         { method = "GET"
         , headers =
             [ Http.header "Authorization"
-              ("Basic " ++ Base64.encode (username ++ ":" ++ password))
+                ("Basic " ++ Base64.encode (username ++ ":" ++ password))
             ]
         , url = url
         , expect = expect
@@ -254,7 +246,8 @@ getUser user username =
 
 
 issueCommand gameId username command =
-    unAuthenticatedPost -- TODO: Authenticate, pass user
+    unAuthenticatedPost
+        -- TODO: Authenticate, pass user
         ("http://localhost:8000/game/"
             ++ String.fromInt gameId
             ++ "/player/"
@@ -275,6 +268,11 @@ previewCommand gameId username command =
         )
         (Http.jsonBody (encodeGameCommand command))
         decodeGameView
+
+
+
+-- TODO: Break this up so we don't have to reload the model completely every
+-- time.
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -320,6 +318,9 @@ init flags url key =
 
         Just Login ->
             Cmd.none
+
+        Just (Home username) ->
+            Cmd.none
     )
 
 
@@ -327,73 +328,9 @@ init flags url key =
 ---- UPDATE ----
 
 
-updateId id model =
-    let
-        currentUser =
-            model.user
-
-        newUser =
-            case model.user of
-                Nothing ->
-                    { email = "", password = "", username = "", id = Just id }
-
-                Just existingUser ->
-                    { existingUser | id = Just id }
-    in
-    { model | user = Just newUser }
-
-
-updateEmail email model =
-    let
-        currentUser =
-            model.user
-
-        newUser =
-            case model.user of
-                Nothing ->
-                    { email = email, password = "", username = "", id = Nothing }
-
-                Just existingUser ->
-                    { existingUser | email = email }
-    in
-    { model | user = Just newUser }
-
-
-updateUsername username model =
-    let
-        currentUser =
-            model.user
-
-        newUser =
-            case model.user of
-                Nothing ->
-                    { username = username, password = "", email = "", id = Nothing }
-
-                Just existingUser ->
-                    { existingUser | username = username }
-    in
-    { model | user = Just newUser }
-
-
-updatePassword password model =
-    let
-        currentUser =
-            model.user
-
-        newUser =
-            case model.user of
-                Nothing ->
-                    { password = password, username = "", email = "", id = Nothing }
-
-                Just existingUser ->
-                    { existingUser | password = password }
-    in
-    { model | user = Just newUser }
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
+    case trace msg of
         Noop ->
             ( model, Cmd.none )
 
@@ -406,8 +343,10 @@ update msg model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            ( { model | url = url }, Cmd.none )
+            -- TODO: don't override everything
+            init () url model.key
 
+        --( { model | url = url }, Cmd.none )
         GotGame result ->
             case result of
                 Err err ->
@@ -534,13 +473,28 @@ update msg model =
         GotUser result ->
             case result of
                 Ok userView ->
+                    let
+                        -- TODO: Extract
+                        url =
+                            { protocol = Url.Http
+                            , host = "localhost"
+                            , port_ = Just 3000
+                            , path = "/home/" ++ userView.username
+                            , query = Nothing
+                            , fragment = Nothing
+                            }
+
+                        cmd =
+                            ExtraCmd.send
+                                (LinkClicked (Browser.Internal url))
+                    in
                     ( updateUsername
                         userView.username
                       <|
                         updateEmail userView.email <|
                             updateId userView.id <|
                                 model
-                    , Cmd.none
+                    , cmd
                     )
 
                 Err err ->
@@ -587,6 +541,14 @@ view model =
         case model.route of
             Just Login ->
                 [ loginPage model ]
+
+            Just (Home username) ->
+                case model.user of
+                    Nothing ->
+                        [ text "Not Found" ]
+
+                    Just user ->
+                        [ home user model.homePageState ]
 
             Nothing ->
                 [ text "Not Found" ]

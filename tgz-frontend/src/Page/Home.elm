@@ -1,4 +1,4 @@
-module Page.Home exposing (..)
+module Page.Home exposing (home, listGames)
 
 import Html
     exposing
@@ -27,7 +27,13 @@ import Model exposing (..)
 import Msg exposing (..)
 
 
-home = div
-  [] []
+home user games =
+    div
+        []
+        [ h1 [] [ text <| "Home of " ++ user.username ]
+        , listGames games
+        ]
 
-listGames model = div [] []
+
+listGames games =
+    div [] []

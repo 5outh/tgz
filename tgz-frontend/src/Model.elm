@@ -1,4 +1,4 @@
-module Model exposing (Fetch(..), HomePageState, Model, Route(..), User)
+module Model exposing (Fetch(..), HomePageState, Model, Route(..))
 
 import ApiTypes as ApiTypes
     exposing
@@ -23,9 +23,11 @@ import ApiTypes as ApiTypes
         , showEmpire
         )
 import Browser.Navigation as Nav
+import Extra.Maybe exposing (lastMay)
 import GameCommand exposing (GameCommand(..), encodeGameCommand, parseGameCommand)
 import GameError exposing (GameError(..), decodeGameErrorFromBadStatusResponse)
 import Http
+import Models.User exposing (User)
 import Url
 
 
@@ -33,6 +35,7 @@ type Route
     = Game Int
     | GamePlayer Int String
     | Login
+    | Home String -- Username
 
 
 type Fetch err a
@@ -44,10 +47,6 @@ type Fetch err a
 type alias HomePageState =
     { games : List GameView
     }
-
-
-type alias User =
-    { username : String, password : String, email : String, id : Maybe Int }
 
 
 type alias Model =
@@ -62,4 +61,24 @@ type alias Model =
     , user : Maybe User
     , userLoggedIn : Bool
     , homePageState : HomePageState
+    }
+
+
+
+-- TODO: idk if this is necessary
+
+
+merge : Model -> Model -> Model
+merge model1 model2 =
+    { game = model2.game
+    , gameView = lastMay model1.gameView model2.gameView
+    , gameError = model2.gameError
+    , signupError = model2.signupError
+    , playerCommand = model2.playerCommand
+    , route = model2.route
+    , key = model2.key
+    , url = model2.url
+    , user = lastMay model1.user model2.user
+    , userLoggedIn = model2.userLoggedIn
+    , homePageState = model2.homePageState
     }

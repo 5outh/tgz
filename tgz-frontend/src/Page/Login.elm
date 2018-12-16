@@ -4,6 +4,7 @@ import Html
     exposing
         ( Attribute
         , Html
+        , a
         , button
         , canvas
         , div
@@ -21,7 +22,17 @@ import Html
         , textarea
         , ul
         )
-import Html.Attributes exposing (for, maxlength, minlength, name, required, type_, value)
+import Html.Attributes
+    exposing
+        ( for
+        , href
+        , maxlength
+        , minlength
+        , name
+        , required
+        , type_
+        , value
+        )
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Model exposing (..)
 import Msg exposing (..)
@@ -36,7 +47,13 @@ loginPage model =
         , div [] [ text "or" ]
         , h3 [] [ text "Signup for tgz [alpha]" ]
         , signupForm
+        , viewLink "/home/beefcake"
         ]
+
+
+viewLink : String -> Html msg
+viewLink path =
+    li [] [ a [ href path ] [ text path ] ]
 
 
 errorDiv model =
