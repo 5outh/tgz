@@ -16,3 +16,10 @@ TODO:
   - show all of their stuff (technology cards, vr/vp round got, god description, specialists)
 - display info on craftsman tiles (owner, at least)
 - preview shouldn't cycle players
+
+- login should be not stupid
+  - Add 'auth_tokens' joined to user
+  - update it when logging in
+  - pass it back to user so they can store it locally without having to store password in plain text and can persist on a personal computer
+  - pull from local storage on elm-init
+  - place in local storage on login and signup

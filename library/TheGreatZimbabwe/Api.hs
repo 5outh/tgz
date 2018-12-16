@@ -12,39 +12,41 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
-import           Crypto.KDF.BCrypt                  (hashPassword,
-                                                     validatePassword)
-import           Data.Aeson                         (FromJSON (..),
-                                                     genericParseJSON)
-import           Data.Bifunctor                     (first)
-import           Data.ByteString                    (ByteString)
-import qualified Data.ByteString.Char8              as B
+import           Crypto.KDF.BCrypt                   (hashPassword,
+                                                      validatePassword)
+import           Data.Aeson                          (FromJSON (..),
+                                                      genericParseJSON)
+import           Data.Bifunctor                      (first)
+import           Data.ByteString                     (ByteString)
+import qualified Data.ByteString.Char8               as B
 import           Data.Pool
-import           Data.Text                          (Text)
-import qualified Data.Text                          as T
-import qualified Data.Text.Lazy                     as TL
-import           Data.Time.Clock                    (getCurrentTime)
+import           Data.Text                           (Text)
+import qualified Data.Text                           as T
+import qualified Data.Text.Lazy                      as TL
+import           Data.Time.Clock                     (getCurrentTime)
 import           Database.Persist.Postgresql
-import qualified Database.Persist.Postgresql        as P
+import qualified Database.Persist.Postgresql         as P
 import           Debug.Trace
 import           GHC.Generics
-import           GHC.Int                            (Int64)
+import           GHC.Int                             (Int64)
 import           Network.HTTP.Types.Status
-import           Network.Wai                        (pathInfo, requestMethod)
+import           Network.Wai                         (pathInfo, requestMethod)
 import           Network.Wai.Middleware.HttpAuth
 import           TheGreatZimbabwe
 import           TheGreatZimbabwe.Aeson
-import qualified TheGreatZimbabwe.Database.Command  as Command
-import qualified TheGreatZimbabwe.Database.Game     as Game
-import qualified TheGreatZimbabwe.Database.GameUser as GameUser
+import           TheGreatZimbabwe.Api.Auth
+import qualified TheGreatZimbabwe.Database.AuthToken as AuthToken
+import qualified TheGreatZimbabwe.Database.Command   as Command
+import qualified TheGreatZimbabwe.Database.Game      as Game
+import qualified TheGreatZimbabwe.Database.GameUser  as GameUser
 import           TheGreatZimbabwe.Database.JSONB
-import qualified TheGreatZimbabwe.Database.User     as User
+import qualified TheGreatZimbabwe.Database.User      as User
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.NewGame
 import           TheGreatZimbabwe.Types
 import           TheGreatZimbabwe.Types.GameCommand
-import           Web.Scotty                         hiding (get, post)
-import qualified Web.Scotty                         as Scotty
+import           Web.Scotty                          hiding (get, post)
+import qualified Web.Scotty                          as Scotty
 
 data Signup = Signup
   { signupUsername :: Text
@@ -55,13 +57,6 @@ data Signup = Signup
 instance FromJSON Signup where
   parseJSON = genericParseJSON (unPrefix "signup")
 
-data Credentials = Credentials
-  { credentialsUsername :: Text
-  , credentialsPassword :: Text
-  } deriving (Generic)
-
-instance FromJSON Credentials where
-  parseJSON = genericParseJSON (unPrefix "credentials")
 
 -- TODO: Environment Variables
 devString :: ConnectionString
@@ -91,6 +86,7 @@ api = do
       runMigration Command.migrateAll
       runMigration Game.migrateAll
       runMigration GameUser.migrateAll
+      runMigration AuthToken.migrateAll
 
     liftIO $ scotty 8000 $ do
       middleware $ basicAuth (authorizeUser pool) authSettings

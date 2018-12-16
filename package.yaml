@@ -38,6 +38,8 @@ dependencies:
   - wai-extra
   - securemem
   - cryptonite
+  - uuid
+  - random
 
 library:
   source-dirs: library
