@@ -275,53 +275,66 @@ previewCommand gameId username command =
 -- time.
 
 
-init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init flags url key =
+initWith : Maybe Model -> () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+initWith mModel flags url key =
     let
         parsedRoute =
             parse routes url
 
-        user =
-            Nothing
+        emptyModel =
+            { game = Loading
+            , gameView = Nothing
+            , gameError = Nothing
+            , signupError = Nothing
+            , playerCommand = ( "", Nothing )
+            , route = parsedRoute
+            , url = url
+            , key = key
+            , user = Nothing
+            , userLoggedIn = False
+            , homePageState = { games = [] }
+            }
     in
-    ( { game = Loading
-      , gameView = Nothing
-      , gameError = Nothing
-      , signupError = Nothing
-      , playerCommand = ( "", Nothing )
-      , route = parsedRoute
-      , url = url
-      , key = key
-      , user = user
-      , userLoggedIn = False
-      , homePageState = { games = [] }
-      }
-    , case parsedRoute of
+    case mModel of
         Nothing ->
-            Cmd.none
+            -- initial state, no fetching required
+            ( emptyModel, Cmd.none )
 
-        Just (Game gameId) ->
-            case user of
-                Nothing ->
-                    Cmd.none
+        Just model ->
+            let
+                cmds =
+                    case parsedRoute of
+                        Nothing ->
+                            Cmd.none
 
-                Just u ->
-                    Http.send GotGame (getGame u gameId)
+                        Just (Game gameId) ->
+                            case model.user of
+                                Nothing ->
+                                    Cmd.none
 
-        Just (GamePlayer gameId playerId) ->
-            case user of
-                Nothing ->
-                    Cmd.none
+                                Just u ->
+                                    Http.send GotGame (getGame u gameId)
 
-                Just u ->
-                    Http.send GotGame (getGame u gameId)
+                        Just (GamePlayer gameId playerId) ->
+                            case model.user of
+                                Nothing ->
+                                    Cmd.none
 
-        Just Login ->
-            Cmd.none
+                                Just u ->
+                                    Http.send GotGame (getGame u gameId)
 
-        Just (Home username) ->
-            Cmd.none
-    )
+                        Just Login ->
+                            Cmd.none
+
+                        Just (Home username) ->
+                            Cmd.none
+            in
+            ( { model | route = parsedRoute }, cmds )
+
+
+init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init =
+    initWith Nothing
 
 
 
@@ -343,8 +356,7 @@ update msg model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            -- TODO: don't override everything
-            init () url model.key
+            initWith (Just model) () url model.key
 
         --( { model | url = url }, Cmd.none )
         GotGame result ->
