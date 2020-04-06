@@ -1,19 +1,29 @@
 <template>
   <div id="app">
-    <img src="./assets/logo.png">
+    <img alt="Vue logo" src="./assets/logo.png" />
     <router-view></router-view>
   </div>
 </template>
 
-<script>
-export default {
-  name: 'app'
-}
+<script lang="ts">
+import { Component, Vue } from "vue-property-decorator";
+import SignupForm from "@/components/SignupForm.vue";
+import LoginForm from "@/components/LoginForm.vue";
+import router from "@/router";
+
+@Component({
+  components: {
+    SignupForm,
+    LoginForm
+  },
+  router
+})
+export default class App extends Vue {}
 </script>
 
 <style>
 #app {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;

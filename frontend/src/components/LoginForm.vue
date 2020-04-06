@@ -1,13 +1,10 @@
 <template>
   <div>
-    <h1>Signup</h1>
+    <h1>Login</h1>
     <form @submit.prevent="onSubmit">
       <div><input v-model="username" placeholder="username" /></div>
       <div>
         <input type="password" v-model="password" placeholder="password" />
-      </div>
-      <div>
-        <input type="email" v-model="email" placeholder="email address" />
       </div>
       <div><button type="submit">Submit</button></div>
     </form>
@@ -21,21 +18,18 @@ export default {
   data: function() {
     return {
       errors: [],
-      email: "",
       username: "",
-      password: "",
-      localStorage: null
+      password: ""
     };
   },
   methods: {
     onSubmit: function(e) {
       e.preventDefault();
       const body = {
-        email: this.email,
         username: this.username,
         password: this.password
       };
-      fetch("http://localhost:8000/signup", {
+      fetch("http://localhost:8000/login", {
         method: "POST",
         body: JSON.stringify(body)
       })
