@@ -15,7 +15,8 @@ import           Control.Monad.Trans.Control
 import           Crypto.KDF.BCrypt                   (hashPassword,
                                                       validatePassword)
 import           Data.Aeson                          (FromJSON (..),
-                                                      genericParseJSON)
+                                                      genericParseJSON, object,
+                                                      (.=))
 import           Data.Bifunctor                      (first)
 import           Data.ByteString                     (ByteString)
 import qualified Data.ByteString.Char8               as B
@@ -57,11 +58,9 @@ data Signup = Signup
 instance FromJSON Signup where
   parseJSON = genericParseJSON (unPrefix "signup")
 
-
 -- TODO: Environment Variables
 devString :: ConnectionString
 devString = "host=localhost dbname=tgz_dev user=bendotk port=5432"
-
 
 authSettings :: AuthSettings
 authSettings = "TGZ"
@@ -167,19 +166,20 @@ postSignup pool = do
     Nothing -> do
       user <- liftIO $ User.newUser signupEmail signupUsername signupPassword
       runDB pool $ insert user
-      status ok200 *> json ()
+      mToken <- runDB pool $ login $ Credentials signupUsername signupPassword
+      case mToken of
+        -- This 500s because a failure to login here should be impossible.
+        Nothing -> status internalServerError500 *> json ()
+        Just (Entity _ AuthToken.AuthToken {..}) ->
+          status ok200 *> json (object ["token" .= authTokenToken])
 
 postLogin pool = do
-  Credentials {..} <- jsonData @Credentials
-  user <- runDB pool $ getBy (User.UniqueUsername credentialsUsername)
-  case user of
+  credentials@Credentials {..} <- jsonData @Credentials
+  mToken                       <- runDB pool $ login credentials
+  case mToken of
     Nothing -> status notFound404 *> json ()
-    Just (Entity _ user) ->
-      if validatePassword (B.pack $ T.unpack credentialsPassword)
-                          (User.userPassword user)
-        then status ok200 *> json ()
-        else status notFound404 *> json ()
-
+    Just (Entity _ AuthToken.AuthToken {..}) ->
+      status ok200 *> json (object ["token" .= authTokenToken])
 
 getGame pool = do
   gameId :: Game.GameId <- toSqlKey <$> param @Int64 "id"

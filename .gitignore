@@ -1,3 +1,4 @@
 *.cabal
 .stack-work/
 tgz-frontend/elm-stuff/
+frontend/node_modules/
