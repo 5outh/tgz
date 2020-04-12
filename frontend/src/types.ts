@@ -1,6 +1,33 @@
-export interface Game {
-  waterTiles: number;
-}
+interface Username { username : string }
+
+interface PlayerInfo
+  { username : Username
+  , email    : string
+  , playerId : number
+  }
+
+interface Points
+  { points : number
+  , step : number
+  }
+
+
+type Rotated<T> = { Rotated: T } | {UnRotated:  T }
+
+interface TechnologyCardState
+  { price : number
+  , cattle : number
+  }
+
+export interface TechnologyCard
+  { name               : string
+  , craftsmanType      : Craftsman
+  , victoryRequirement : number
+  , victoryPoints      : number
+  , cost               : number
+  }
+
+type Activation = 'BuilderActive' | 'NomadsActive' | 'None'
 
 export interface Player
   { info               : PlayerInfo | null
@@ -8,10 +35,10 @@ export interface Player
   , victoryPoints      : Points
   , empire             : Empire | null
   , cattle             : number
-      , monuments          : Map<Location, Natural>
+      , monuments          : Map<Location, number>
       , craftsmen          : Map<Location,  Rotated<Craftsman>>
       , technologyCards    : Map<TechnologyCard, TechnologyCardState>
-      , specialists        : Map<Specialist,  Int>
+      , specialists        : Map<Specialist,  number>
   , god                : God | null
       , activations : Array<Activation>
   }
@@ -31,6 +58,14 @@ export interface GenerosityOfKingsState
   , lastBid       : number | null
   , playersPassed : Array<number>
   }
+
+type Phase
+  = "PreSetup"
+  | "Setup"
+  | "GenerosityOfKings"
+  | "ReligionAndCulture"
+  | "Revenues"
+  | "LetUsCompareMythologies"
 
 export interface Round
   { players                : Array<number>
