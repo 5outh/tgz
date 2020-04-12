@@ -212,6 +212,7 @@ postPlayerGameCommand pool = do
 
 data PostGame = PostGame
   { postGameUsernames :: [Text]
+  , postGameName      :: Text
   } deriving (Generic)
 
 instance FromJSON PostGame where
@@ -220,9 +221,7 @@ instance FromJSON PostGame where
 postGame pool = do
   PostGame {..} <- jsonData @PostGame
 
-  admin         <- getAuthorizedUser pool
-
-  gameName      <- param "name"
+  admin <- getAuthorizedUser pool
   users <- runDB pool $ selectList [User.UserUsername <-. postGameUsernames] []
 
   let playerInfos = map User.toPlayerInfoWithId users
@@ -234,7 +233,8 @@ postGame pool = do
       InternalError _ -> status internalServerError500 *> json gameError
     Right gameData -> do
       mSavedGameData <- runDB pool $ do
-        key <- insert (Game.Game gameName (entityKey admin) (JSONB gameData))
+        key <- insert
+          (Game.Game postGameName (entityKey admin) (JSONB gameData))
         P.getEntity key
       case mSavedGameData of
         Nothing            -> status internalServerError500 *> json ()
