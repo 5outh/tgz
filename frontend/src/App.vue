@@ -9,12 +9,14 @@
 import { Component, Vue } from "vue-property-decorator";
 import SignupForm from "@/components/SignupForm.vue";
 import LoginForm from "@/components/LoginForm.vue";
+import Home from "@/components/Home.vue";
 import router from "@/router";
 
 @Component({
   components: {
     SignupForm,
-    LoginForm
+    LoginForm,
+    Home
   },
   router
 })

@@ -21,7 +21,8 @@ export default new Router({
     {
       path: "/",
       name: "Home",
-      component: Home
+      component: Home,
+      props: { userId: 17 } // TODO: Fix
     }
   ]
 });

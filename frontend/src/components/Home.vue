@@ -7,14 +7,41 @@
 
 <script lang="ts">
 import { getAuthToken } from "@/auth";
-import { Component, Vue } from "vue-property-decorator";
+import { Component, Prop, Vue } from "vue-property-decorator";
+
+interface Game {
+  waterTiles: number;
+}
 
 @Component
 export default class Home extends Vue {
+  @Prop({ required: true }) readonly userId!: number;
   private token: string | null = null;
+  private games: Array<Game> = [];
 
   mounted() {
+    const self = this;
     this.token = getAuthToken();
+    // todo;
+
+    this.fetchGames(this.userId)
+      .then((games: Array<Game>) => {
+        self.games = games;
+      })
+      .catch(console.error);
+  }
+
+  private fetchGames(userId: number): Promise<Array<Game>> {
+    return fetch(`http://localhost:8000/users/${userId}/games`, {
+      headers: {
+        Authorization: `Bearer ${this.token}`
+      }
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    });
   }
 }
 </script>

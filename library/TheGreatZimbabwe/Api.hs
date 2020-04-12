@@ -88,38 +88,29 @@ api = do
       runMigration AuthToken.migrateAll
 
     liftIO $ scotty 8000 $ do
-      middleware $ basicAuth (authorizeUser pool) authSettings
-
       routes pool
-
-authorizeUser :: ConnectionPool -> ByteString -> ByteString -> IO Bool
-authorizeUser pool u p = do
-  mUser <- runDB pool $ getBy (User.UniqueUsername (T.pack $ B.unpack u))
-  pure $ case mUser of
-    Nothing              -> False
-    Just (Entity _ user) -> validatePassword p (User.userPassword user)
-
-data AuthError = UserNotFound | UserCredentialsInvalid
-  deriving (Show, Eq)
 
 -- re-checks the user
 getAuthorizedUser pool = do
   mAuthHeader <- header "Authorization"
   case mAuthHeader of
-    Just text -> case extractBasicAuth (B.pack (TL.unpack text)) of
-      Nothing                   -> raise "Authorzation header is malformed"
-      Just (username, password) -> do
-        mUser <- runDB pool
-          $ getBy (User.UniqueUsername (T.pack (B.unpack username)))
+    Just token -> case extractBearerAuth (B.pack (TL.unpack token)) of
+      Nothing          -> raise "Authorzation header is malformed"
+      Just bearerToken -> do
+        mUser <- do
+          mToken <- runDB pool $ selectFirst
+            [AuthToken.AuthTokenToken ==. (T.pack (B.unpack bearerToken))]
+            []
+          case mToken of
+            Nothing -> raise "Auth token not found."
+            Just (Entity _ AuthToken.AuthToken {..}) ->
+              runDB pool $ selectFirst [User.UserId ==. authTokenUserId] []
         case mUser of
-          Nothing -> raise "User is missing"
-          Just user ->
-            if validatePassword password (User.userPassword (entityVal user))
-              then pure user
-              else raise "User credentials incorrect"
-
+          Nothing   -> raise "User is missing or auth token is incorrect"
+          Just user -> pure user
     Nothing -> raise "Authorization header missing"
 
+-- TODO: need a /me route by token
 routes :: ConnectionPool -> ScottyM ()
 routes pool = do
   httpPost "/signup" (postSignup pool)

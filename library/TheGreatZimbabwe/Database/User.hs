@@ -25,8 +25,6 @@ import           Elm.Derive
 import           TheGreatZimbabwe.Aeson
 import           TheGreatZimbabwe.Types
 
--- TODO add password
-
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
   User sql=users
     email     Text
