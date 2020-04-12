@@ -7,16 +7,16 @@
 
 <script lang="ts">
 import { getAuthToken } from "@/auth";
+import { Component, Vue } from "vue-property-decorator";
 
-export default {
-  name: "Home",
-  data: function() {
-    return { token: null };
-  },
-  mounted: function() {
+@Component
+export default class Home extends Vue {
+  private token: string | null = null;
+
+  mounted() {
     this.token = getAuthToken();
   }
-};
+}
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
