@@ -1,18 +1,37 @@
-interface Username { username : string }
+import * as t from 'io-ts'
 
-interface PlayerInfo
+const Username = t.type({
+  username: t.string
+})
+export type Username = t.TypeOf<typeof Username>
+
+const PlayerInfo = t.type(
   { username : Username
-  , email    : string
-  , playerId : number
-  }
+  , email    : t.string
+  , playerId : t.number
+  })
+export type PlayerInfo = t.TypeOf<typeof PlayerInfo>
 
-interface Points
-  { points : number
-  , step : number
-  }
+const Points = t.type(
+  { points : t.number
+  , step : t.number
+  })
+export type Points = t.TypeOf<typeof Points>
 
+// TODO: Fix
+// export type Rotated<T> = { Rotated: T } | {UnRotated: T}
 
-type Rotated<T> = { Rotated: T } | {UnRotated:  T }
+const Rotated = <C extends t.Mixed>(codec: C) => t.union([t.type({Rotated: codec}), t.type({UnRotated: codec}) ])
+
+// const _Rotated = <C extends t.Mixed>(codec: C) => t.type({Rotated: codec})
+// const _UnRotated = <C extends t.Mixed>(codec: C) => t.type({UnRotated: codec})
+// const Rotated = <C extends t.Mixed>(codec: C) => t.union([_Rotated<C>,_UnRotated<C>])
+// export type Rotated<T> = t.TypeOf<typeof Rotated<T>>
+
+const Links = t.type({
+  previous: t.string,
+  next: t.string
+})
 
 interface TechnologyCardState
   { price : number
