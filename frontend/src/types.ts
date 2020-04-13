@@ -18,9 +18,6 @@ const Points = t.type(
   })
 export type Points = t.TypeOf<typeof Points>
 
-// TODO: Fix
-// export type Rotated<T> = { Rotated: T } | {UnRotated: T}
-
 const Rotated = <C extends t.Mixed>(codec: C) => t.union([t.type({Rotated: codec}), t.type({UnRotated: codec}) ])
 
 // const _Rotated = <C extends t.Mixed>(codec: C) => t.type({Rotated: codec})
@@ -28,134 +25,150 @@ const Rotated = <C extends t.Mixed>(codec: C) => t.union([t.type({Rotated: codec
 // const Rotated = <C extends t.Mixed>(codec: C) => t.union([_Rotated<C>,_UnRotated<C>])
 // export type Rotated<T> = t.TypeOf<typeof Rotated<T>>
 
-const Links = t.type({
-  previous: t.string,
-  next: t.string
+const TechnologyCardState = t.type(
+  { price : t.number
+  , cattle : t.number
+  })
+export type TechnologyCardState = t.TypeOf<typeof TechnologyCardState>
+
+const Craftsman = t.keyof({
+  potter: null,
+  ivoryCarver: null,
+  woodCarver: null,
+  diamondCutter: null,
+  vesselMaker: null,
+  throneMaker: null,
+  sculptor: null
 })
+export type Craftsman = t.TypeOf<typeof Craftsman>
 
-interface TechnologyCardState
-  { price : number
-  , cattle : number
-  }
-
-export interface TechnologyCard
-  { name               : string
+const TechnologyCard = t.type(
+  { name               : t.string
   , craftsmanType      : Craftsman
-  , victoryRequirement : number
-  , victoryPoints      : number
-  , cost               : number
-  }
+  , victoryRequirement : t.number
+  , victoryPoints      : t.number
+  , cost               : t.number
+  })
+export type TechnologyCard = t.TypeOf<typeof TechnologyCard>
 
-type Activation = 'BuilderActive' | 'NomadsActive' | 'None'
+const Activation = t.union([t.literal('BuilderActive'), t.literal('NomadsActive'), t.literal('None')])
+export type Activation = t.TypeOf<typeof Activation>
 
-export interface Player
-  { info               : PlayerInfo | null
+const Location = t.type({x: t.number, y: t.string})
+export type Location = t.TypeOf<typeof Location>
+
+
+const Empire = t.union([
+  t.literal("kilwa")
+  , t.literal("mutapa")
+  , t.literal("zulu")
+  , t.literal("lozi")
+  , t.literal("mapungubwe")
+  ])
+export type Empire = t.TypeOf<typeof Empire>
+
+const Specialist = t.keyof({
+  Shaman: null,
+  RainCeremony: null,
+  Herd: null,
+  Builder: null,
+  Nomads: null
+  })
+export type Specialist = t.TypeOf<typeof Specialist>
+
+const God = t.keyof({
+  Shadipinyi: t.any ,
+  Elegua: t.any ,
+  Dziva: t.any ,
+  Eshu: t.any ,
+  Gu: t.any ,
+  Obatala: t.any ,
+  Atete: t.any ,
+  TsuiGoab: t.any ,
+  Anansi: t.any ,
+  Qamata: t.number ,
+  Engai : t.any ,
+  Xango  : t.any ,
+})
+export type God = t.TypeOf<typeof God>
+
+
+const Player = t.type(
+  { info               : t.union([PlayerInfo,  t.null])
   , victoryRequirement : Points
   , victoryPoints      : Points
-  , empire             : Empire | null
-  , cattle             : number
-      , monuments          : Map<Location, number>
-      , craftsmen          : Map<Location,  Rotated<Craftsman>>
-      , technologyCards    : Map<TechnologyCard, TechnologyCardState>
-      , specialists        : Map<Specialist,  number>
-  , god                : God | null
-      , activations : Array<Activation>
-  }
+  , empire             : t.union([Empire, t.null])
+  , cattle             : t.number
+  , monuments          : t.array(t.record(Location, t.number))
+  , craftsmen          : t.array(t.record(Location, Rotated(Craftsman)))
+  , technologyCards    : t.array(t.record(TechnologyCard, TechnologyCardState))
+  , specialists        : t.array(t.record(Specialist, t.number))
+  , god                : t.union([God , t.null])
+  , activations        : t.array(Activation)
+  })
+export type Player = t.TypeOf<typeof Player>
 
-type Empire
-  = "kilwa"
-  | "mutapa"
-  | "zulu"
-  | "lozi"
-  | "mapungubwe"
+const EmpirePlaque = t.union([t.type({PlayerPlaque: Empire}), t.type({ShadipinyiPlaque: t.any})])
+export type EmpirePlaque = t.TypeOf<typeof EmpirePlaque>
 
-type EmpirePlaque = { PlayerPlaque:  Empire } | { ShadipinyiPlaque: any }
+const GenerosityOfKingsState = t.type(
+  { plaques       : t.array( EmpirePlaque )
+  , cattlePool    : t.number
+  , lastBid       : t.union([t.number , t.null])
+  , playersPassed : t.array( t.number )
+  })
+export type GenerosityOfKingsState = t.TypeOf<typeof GenerosityOfKingsState>
 
-export interface GenerosityOfKingsState
-  { plaques       : Array<EmpirePlaque>
-  , cattlePool    : number
-  , lastBid       : number | null
-  , playersPassed : Array<number>
-  }
+const Phase = t.keyof({
+  "PreSetup" : null,
+  "Setup": null,
+  "GenerosityOfKings": null,
+  "ReligionAndCulture": null,
+  "Revenues": null,
+  "LetUsCompareMythologies": null
+})
+export type Phase = t.TypeOf<typeof Phase>
 
-type Phase
-  = "PreSetup"
-  | "Setup"
-  | "GenerosityOfKings"
-  | "ReligionAndCulture"
-  | "Revenues"
-  | "LetUsCompareMythologies"
-
-export interface Round
-  { players                : Array<number>
-  , currentPlayer          : number | null
-  , usedMarkers            : Map<Location,  number>
+const Round = t.type(
+  { players                : t.array( t.number )
+  , currentPlayer          : t.union([t.number , t.null])
+  , usedMarkers            : t.array(t.record(Location, t.number))
   , generosityOfKingsState : GenerosityOfKingsState
-  , currentPhase           : Phase | null
-  , step : number
-  }
+  , currentPhase           : t.union([Phase , t.null])
+  , step : t.number
+  })
+export type Round = t.TypeOf<typeof Round>
 
-type Land
-  = { StartingArea : any }
-  | { BlankLand : any }
-  | { Resource : Resource }
+const Resource = t.keyof({ Clay: null, Wood: null , Ivory: null, Diamonds: null })
+export type Resource = t.TypeOf<typeof Resource>
 
-export type Square
-  = { Water : any }
-  | { Land:  Land }
+const Land = t.keyof({
+    StartingArea : t.any,
+    BlankLand : t.any,
+    Resource : Resource
+  })
+export type Land = t.TypeOf<typeof Land>
 
-export interface MapLayout { mapLayout : Map<Location, Square> }
+const Square = t.keyof({
+  Water: t.any,
+  Land: Land
+})
+export type Square = t.TypeOf<typeof Square>
 
-export type Craftsman
-  = "potter"
-  | "ivoryCarver"
-  | "woodCarver"
-  | "diamondCutter"
-  | "vesselMaker"
-  | "throneMaker"
-  | "sculptor"
+const MapLayout = t.type({ mapLayout : t.array(t.record(Location, Square)) })
+export type MapLayout = t.TypeOf<typeof MapLayout>
 
-export interface TechnologyCard
-  { name               : string
-  , craftsmanType      : Craftsman
-  , victoryRequirement : number
-  , victoryPoints      : number
-  , cost               : number
-  }
-
-export type God
-  = { Shadipinyi: any }
-  | { Elegua: any }
-  | { Dziva: any }
-  | { Eshu: any }
-  | { Gu: any }
-  | { Obatala: any }
-  | { Atete: any }
-  | { TsuiGoab: any }
-  | { Anansi: any }
-  | { Qamata: number }
-  | { Engai : any }
-  | { Xango  : any }
-
-export type Specialist
-  = "Shaman"
-  | "RainCeremony"
-  | "Herd"
-  | "Builder"
-  | "Nomads"
-
-export type Resource = "Clay" | "Wood" | "Ivory" | "Diamonds"
-
-export interface Game
-  { players   : Map<number, Player>
+const Game = t.type(
+  { players   : t.array(t.record(t.number, Player))
   , round     : Round
   , mapLayout : MapLayout
-  , technologyCards : Map<Craftsman, Array<TechnologyCard>>
-  , gods : Array<God>
-  , specialists : Array<Specialist>
-  , winner    : number | null
-  , step : number
-  , resourceTiles : Map<Resource,  number>
-  , waterTiles : number
-  , craftsmanTiles : Map<Craftsman, number>
-  }
+  , technologyCards : t.array(t.record(Craftsman, t.array(TechnologyCard)))
+  , gods : t.array( God )
+  , specialists : t.array( Specialist )
+  , winner    : t.union([t.number , t.null])
+  , step : t.number
+  , resourceTiles : t.array(t.record(Resource, t.number))
+  , waterTiles : t.number
+  , craftsmanTiles : t.array(t.record(Craftsman, t.number))
+  })
+export type Game = t.TypeOf<typeof Game>
