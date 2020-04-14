@@ -1,7 +1,7 @@
 <template>
   <div>
     <h1>Game</h1>
-    {{ game }}
+    <game-canvas v-bind:game="game" />
     <ul>
       <li v-for="error in errors" :key="error">{{ error }}</li>
     </ul>
@@ -17,9 +17,15 @@ import { GameViewV } from "@/types";
 import { pipe } from 'fp-ts/lib/pipeable'
 import { fold } from 'fp-ts/lib/Either'
 import { PathReporter } from 'io-ts/lib/PathReporter'
+import GameCanvas from "@/components/GameCanvas.vue"
 import * as t from 'io-ts'
 
-@Component
+@Component({
+  name: 'GameCanvas',
+  components: {
+    'game-canvas': GameCanvas
+  }
+})
 export default class Home extends Vue {
   private token: string | null = null;
   private usernameText: string = "";
