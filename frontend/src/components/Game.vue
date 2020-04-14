@@ -2,6 +2,9 @@
   <div>
     <h1>Game</h1>
     {{ game }}
+    <ul>
+      <li v-for="error in errors" :key="error">{{ error }}</li>
+    </ul>
   </div>
 </template>
 
@@ -21,6 +24,7 @@ export default class Home extends Vue {
   private token: string | null = null;
   private usernameText: string = "";
   private game: GameView | null = null;
+  private errors: Array<string> = [];
 
   mounted() {
     const self = this;
@@ -68,6 +72,7 @@ export default class Home extends Vue {
   private fetchGame(gameId: number, token: string): Promise<GameView | void> {
     const onLeft = (errors : t.Errors) => {}
     const onRight = (game : GameView) => game
+    const self = this
 
     return authorizedFetch(`http://localhost:8000/games/${gameId}`, token).then(
       (response: Response) => {
@@ -79,8 +84,7 @@ export default class Home extends Vue {
         console.log({data})
         const result = GameViewV.decode(data)
 
-        console.log(PathReporter.report(result))
-
+        self.errors = PathReporter.report(result);
         return pipe(result, fold(onLeft, onRight));
       });
   }
@@ -92,15 +96,10 @@ export default class Home extends Vue {
 h3 {
   margin: 40px 0 0;
 }
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-li {
-  display: inline-block;
-  margin: 0 10px;
-}
 a {
   color: #42b983;
+}
+li {
+  font-size: 14px;
 }
 </style>
