@@ -1,7 +1,7 @@
 <template>
   <div>
     <h1>Game</h1>
-    <game-canvas v-bind:game="game" />
+    <game-canvas v-if="game" v-bind:game="game" />
     <ul>
       <li v-for="error in errors" :key="error">{{ error }}</li>
     </ul>
