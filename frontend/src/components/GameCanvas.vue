@@ -119,11 +119,9 @@ export function renderMapLayout(ctx: any, mapLayout: any) {
           rect.fill(ctx);
           ctx.fillStyle = "Brown"
           rect.padded(size/10).fill(ctx)
-          ctx.font = textSize + "px monospace";
         }
 
         if (square.Land.BlankLand) {
-          ctx.font = textSize + "px monospace";
           rect.fill(ctx)
         }
 
@@ -132,29 +130,21 @@ export function renderMapLayout(ctx: any, mapLayout: any) {
             case "Clay":
               ctx.fillStyle = "Orange"
               rect.fill(ctx)
-              ctx.font = textSize + "px monospace";
               break;
             case "Diamonds":
               ctx.fillStyle = "LightBlue"
               rect.fill(ctx)
-              ctx.font = textSize + "px monospace";
               break;
             case "Ivory":
               ctx.fillStyle = "White"
               rect.fill(ctx)
-              ctx.font = textSize + "px monospace";
               break;
             case "Wood":
               ctx.fillStyle = "Purple"
               rect.fill(ctx)
-              ctx.font = textSize + "px monospace";
               break;
           }
         }
-
-        ctx.fillStyle = "Black";
-        ctx.font = smallTextSize + "px monospace";
-        // ctx.fillText(locationText(location), locTextX, locTextY);
       }
 
       if (square.Water) {
