@@ -83,6 +83,10 @@ class Rect {
     ctx.fillRect(this.x, this.y, this.w, this.h);
   }
 
+  public stroke(ctx: CanvasRenderingContext2D): void {
+    ctx.strokeRect(this.x, this.y, this.w, this.h);
+  }
+
   public padded(padding: number) : Rect {
     return new Rect(this.x+padding, this.y+padding, this.w-2*padding, this.h-2*padding);
   }
@@ -120,29 +124,29 @@ export function renderMapLayout(ctx: any, mapLayout: any) {
 
         if (square.Land.BlankLand) {
           ctx.font = textSize + "px monospace";
-          ctx.fillRect(x, y, size, size);
+          rect.fill(ctx)
         }
 
         if (square.Land.Resource) {
           switch (square.Land.Resource) {
             case "Clay":
               ctx.fillStyle = "Orange"
-              ctx.fillRect(x, y, size, size);
+              rect.fill(ctx)
               ctx.font = textSize + "px monospace";
               break;
             case "Diamonds":
               ctx.fillStyle = "LightBlue"
-              ctx.fillRect(x, y, size, size);
+              rect.fill(ctx)
               ctx.font = textSize + "px monospace";
               break;
             case "Ivory":
               ctx.fillStyle = "White"
-              ctx.fillRect(x, y, size, size);
+              rect.fill(ctx)
               ctx.font = textSize + "px monospace";
               break;
             case "Wood":
               ctx.fillStyle = "Purple"
-              ctx.fillRect(x, y, size, size);
+              rect.fill(ctx)
               ctx.font = textSize + "px monospace";
               break;
           }
@@ -156,18 +160,20 @@ export function renderMapLayout(ctx: any, mapLayout: any) {
       if (square.Water) {
         ctx.strokeStyle = "MidnightBlue";
         ctx.fillStyle = "MidnightBlue";
-        ctx.fillRect(x, y, size, size);
+        rect.fill(ctx)
       }
     }
 
+    // Stroke all squares except water
     for (let i = 0; i < mapLayout.length; i++) {
       const [location, square] = mapLayout[i];
       const [x, y] = locationToCoordinates(size, location);
+      const rect = new Rect(x,y,size,size)
 
       if (!square.Water) {
         ctx.strokeStyle = "Black";
         ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, size, size);
+        rect.stroke(ctx)
       }
     }
   }
