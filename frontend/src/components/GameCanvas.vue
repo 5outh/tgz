@@ -66,6 +66,28 @@ function locationToCoordinates(size:any, location:any) {
   return [(x - 1) * size + 1, yIndex * size + 1];
 }
 
+class Rect {
+  private x : number;
+  private y : number;
+  private w : number;
+  private h : number;
+
+  constructor(x: number, y: number, w: number, h: number) {
+    this.x = x
+    this.y = y
+    this.w = w
+    this.h = h
+  }
+
+  public fill(ctx: CanvasRenderingContext2D): void {
+    ctx.fillRect(this.x, this.y, this.w, this.h);
+  }
+
+  public padded(padding: number) : Rect {
+    return new Rect(this.x+padding, this.y+padding, this.w-2*padding, this.h-2*padding);
+  }
+}
+
 export function renderMapLayout(ctx: any, mapLayout: any) {
   // either 12 or 18 squares
   let numSquares = 18;
@@ -84,13 +106,15 @@ export function renderMapLayout(ctx: any, mapLayout: any) {
     for (let i = 0; i < mapLayout.length; i++) {
       const [location, square] = mapLayout[i];
       const [x, y] = locationToCoordinates(size, location);
+      const rect = new Rect(x,y,size,size);
 
       ctx.fillStyle = "Linen";
       if (square.Land) {
         if (square.Land.StartingArea) {
           ctx.fillRect(x, y, size, size);
+          rect.fill(ctx);
           ctx.fillStyle = "Brown"
-          ctx.fillRect(x+(size/10), y+(size/10), size-2*(size/10), size-2*(size/10));
+          rect.padded(size/10).fill(ctx)
           ctx.font = textSize + "px monospace";
         }
 
@@ -112,7 +136,7 @@ export function renderMapLayout(ctx: any, mapLayout: any) {
               ctx.font = textSize + "px monospace";
               break;
             case "Ivory":
-              ctx.fillStyle = "Ivory"
+              ctx.fillStyle = "White"
               ctx.fillRect(x, y, size, size);
               ctx.font = textSize + "px monospace";
               break;
