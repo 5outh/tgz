@@ -57,11 +57,39 @@ deriveBoth (unPrefix "religionAndCultureMultiCommand") ''ReligionAndCultureMulti
 
 data GameCommand
   = ChooseEmpire Empire
+  -- ^ @choose-empire mapungubwe@
   | PlaceStartingMonument Location
+  -- ^ place-starting-monument a4
   | Bid Natural
+  -- ^ bid 4
   | Pass
+  -- ^ pass
   | ReligionAndCultureCommand ReligionAndCultureMultiCommand
-  -- ^ Required to end a religion and culture command. Does nothing otherwise.
+  -- ^
+  -- set dziva prices:
+  -- - set-price-dziva potter 3
+  -- one of these 3:
+  --  command 1, one of:
+  --  - choose-god anansi
+  --  - choose-specialist herd. herd 2 -- MUST be used on this turn
+  --  command 2, one of:
+  --  - shaman ivory a7
+  --  - rain-ceremony a9
+  --  - herd 3
+  --  - builder
+  --  - nomads
+  --  command 3, one of:
+  --  1. build-monument a3 (+ more allowed if obatala)
+  --  2. place-craftsman a4 (rotate potter). set-price potter 3 -- must appear together
+  --     -- can also set other prices:
+  --     set-price diamond-cutter 1
+  --  3. raise a9
+  --     hub a1
+  --     use-craftsman a3 b1 -- use the craftsman at a3 using resource at b1
+  --     -- and so on
+  --
+  --  Note: when specialists are chosen they must also be used that turn
+  --
   deriving (Generic, Show)
 
 deriveBoth defaultOptions ''GameCommand
