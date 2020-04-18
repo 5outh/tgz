@@ -11,7 +11,7 @@ import           TheGreatZimbabwe.ReligionAndCulture (RaiseMonumentCommand (..))
 import           TheGreatZimbabwe.Types
 
 data ReligionAndCultureCommand1 = ChooseGod God | ChooseSpecialist Specialist
-  deriving (Show)
+  deriving (Show, Eq)
 
 deriveBoth defaultOptions ''ReligionAndCultureCommand1
 
@@ -24,14 +24,14 @@ data UseSpecialist
   -- ^ Use a herd n times
   | UseBuilder
   | UseNomads
-  deriving (Show)
+  deriving (Show,Eq)
 
 deriveBoth defaultOptions ''UseSpecialist
 
 data SetPrice = SetPrice
   { setPricePrice     :: Int
   , setPriceCraftsman :: Craftsman
-  } deriving (Show)
+  } deriving (Show,Eq)
 
 deriveBoth (unPrefix "setPrice") ''SetPrice
 
@@ -39,7 +39,7 @@ data ReligionAndCultureCommand3
   = BuildMonuments (NonEmpty Location)
   | PlaceCraftsmen [(Location, Rotated Craftsman)] [SetPrice]
   | RaiseMonuments [(Location, [RaiseMonumentCommand])]
-  deriving (Show)
+  deriving (Show,Eq)
 
 deriveBoth defaultOptions ''ReligionAndCultureCommand3
 
@@ -51,7 +51,7 @@ data ReligionAndCultureMultiCommand = ReligionAndCultureMultiCommand
   , religionAndCultureMultiCommandAction2 :: Maybe UseSpecialist
   , religionAndCultureMultiCommandAction3 :: Maybe ReligionAndCultureCommand3
   , religionAndCultureMultiCommandEnd     :: Bool
-  } deriving (Show)
+  } deriving (Show, Eq)
 
 deriveBoth (unPrefix "religionAndCultureMultiCommand") ''ReligionAndCultureMultiCommand
 
@@ -90,6 +90,6 @@ data GameCommand
   --
   --  Note: when specialists are chosen they must also be used that turn
   --
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
 
 deriveBoth defaultOptions ''GameCommand
