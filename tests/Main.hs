@@ -13,6 +13,7 @@ import           Data.List.NonEmpty                        (NonEmpty (..))
 import qualified Data.Map.Strict                           as M
 import           Data.Monoid
 import qualified Data.Set                                  as S
+import qualified Data.Text                                 as T
 import           Data.Validation
 import           Test.Hspec
 import           Text.Megaparsec
@@ -23,6 +24,7 @@ import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.Game
 import           TheGreatZimbabwe.MapLayout
 import           TheGreatZimbabwe.NewGame
+import           TheGreatZimbabwe.ReligionAndCulture
 import           TheGreatZimbabwe.Types
 import           TheGreatZimbabwe.Types.GameCommand
 import           TheGreatZimbabwe.Types.GameCommand.Parser
@@ -95,6 +97,7 @@ testParseReligionAndCultureMultiCommand = do
                           "set-price potter 3\nset-price vessel-maker 2"
       religionAndCultureMultiCommandDziva res
         `shouldBe` Just [SetPrice 3 Potter, SetPrice 2 VesselMaker]
+
     it "should parse choose-god command" $ do
       let res =
             testParse parseReligionAndCultureMultiCommand "choose-god anansi"
@@ -137,17 +140,79 @@ testParseReligionAndCultureMultiCommand = do
       let res = testParse parseReligionAndCultureMultiCommand "nomads"
       religionAndCultureMultiCommandAction2 res `shouldBe` Just UseNomads
 
-    it "should parse the raise-monument command" $ do
+    it "should parse the place-monument command" $ do
       let res =
-            testParse parseReligionAndCultureMultiCommand "raise-monument a11"
+            testParse parseReligionAndCultureMultiCommand "place-monument a11"
       religionAndCultureMultiCommandAction3 res
         `shouldBe` Just (BuildMonuments (Location 11 'a' :| []))
 
-    it "should parse multiple raise-monument commands" $ do
+    it "should parse multiple place-monument commands" $ do
       let res = testParse parseReligionAndCultureMultiCommand
-                          "raise-monument a11\nraise-monument b1"
+                          "place-monument a11\nplace-monument b1"
       religionAndCultureMultiCommandAction3 res
         `shouldBe` Just (BuildMonuments (Location 11 'a' :| [Location 1 'b']))
+
+    it "should parse a place-craftsman command" $ do
+      let
+        res = testParse parseReligionAndCultureMultiCommand
+                        "place-craftsman potter a1"
+      religionAndCultureMultiCommandAction3 res `shouldBe` Just
+        (PlaceCraftsmen [(Location 1 'a', UnRotated Potter)] [])
+
+    it "should parse a place-craftsman/set-prices command" $ do
+      let res = testParse parseReligionAndCultureMultiCommand
+                          "place-craftsman potter a1\nset-price potter 1"
+      religionAndCultureMultiCommandAction3 res
+        `shouldBe` Just
+                     (PlaceCraftsmen [(Location 1 'a', UnRotated Potter)]
+                                     [SetPrice 1 Potter]
+                     )
+
+    it "should parse a raise-monument command" $ do
+      let res = testParse
+            parseReligionAndCultureMultiCommand
+            "raise-monument a1\nuse-hub a3\nuse-craftsman a5 b5"
+      religionAndCultureMultiCommandAction3 res `shouldBe` Just
+        (RaiseMonuments
+          [ ( (Location 1 'a')
+            , [ UseHub (Location 3 'a')
+              , UseCraftsman (Location 5 'a') (Location 5 'b')
+              ]
+            )
+          ]
+        )
+
+    it "should parse all phases in a single command" $ do
+      let res =
+            testParse parseReligionAndCultureMultiCommand $ T.pack $ unlines
+              [ "set-price potter 3"
+              , "set-price vessel-maker 2"
+              , "choose-god anansi"
+              , "shaman ivory a11"
+              , "raise-monument a1"
+              , "use-hub a3"
+              , "use-craftsman a5 b5"
+              ]
+
+      religionAndCultureMultiCommandDziva res
+        `shouldBe` Just [SetPrice 3 Potter, SetPrice 2 VesselMaker]
+
+      religionAndCultureMultiCommandAction1 res
+        `shouldBe` Just (ChooseGod Anansi)
+
+      religionAndCultureMultiCommandAction2 res
+        `shouldBe` Just (UseShaman Ivory $ Location 11 'a')
+
+      religionAndCultureMultiCommandAction3 res `shouldBe` Just
+        (RaiseMonuments
+          [ ( (Location 1 'a')
+            , [ UseHub (Location 3 'a')
+              , UseCraftsman (Location 5 'a') (Location 5 'b')
+              ]
+            )
+          ]
+        )
+
 
 testParseLocation :: Spec
 testParseLocation = do

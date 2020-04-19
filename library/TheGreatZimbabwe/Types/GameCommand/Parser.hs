@@ -2,12 +2,17 @@
 {-# LANGUAGE OverloadedStrings   #-}
 module TheGreatZimbabwe.Types.GameCommand.Parser where
 
+import           Data.Either                         (partitionEithers)
 import           Data.Foldable
-import           Data.Text                          (Text)
-import           Data.Void                          (Void)
+import           Data.List.NonEmpty                  (NonEmpty (..))
+import qualified Data.List.NonEmpty                  as NE
+import           Data.Maybe                          (fromMaybe)
+import           Data.Text                           (Text)
+import           Data.Void                           (Void)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer         as L
+import qualified Text.Megaparsec.Char.Lexer          as L
+import           TheGreatZimbabwe.ReligionAndCulture
 import           TheGreatZimbabwe.Types
 import           TheGreatZimbabwe.Types.GameCommand
 
@@ -64,7 +69,6 @@ parseReligionAndCultureMultiCommand = do
     <*> parseAction1
     <*> parseAction2
     <*> parseAction3
-    <*> parseEnd
 
 parseDziva :: Parser (Maybe [SetPrice])
 parseDziva = label "Dziva Command" $ optional (many parseSetPrice)
@@ -159,7 +163,44 @@ parseUseNomads :: Parser UseSpecialist
 parseUseNomads = UseNomads <$ symbol "nomads"
 
 parseAction3 :: Parser (Maybe ReligionAndCultureCommand3)
-parseAction3 = pure Nothing
+parseAction3 =
+  optional $ parseBuildMonuments <|> parsePlaceCraftsmen <|> parseRaiseMonuments
 
-parseEnd :: Parser Bool
-parseEnd = pure False
+parseBuildMonuments :: Parser ReligionAndCultureCommand3
+parseBuildMonuments =
+  BuildMonuments <$> (many1 $ symbol "place-monument" *> parseLocation)
+
+parsePlaceCraftsmen :: Parser ReligionAndCultureCommand3
+parsePlaceCraftsmen = do
+  eActions <- many1 (eitherP parsePlaceCraftsman parseSetPrice)
+  let (placeCraftsmen, setPrices) = partitionEithers $ NE.toList eActions
+  pure $ PlaceCraftsmen placeCraftsmen setPrices
+ where
+  parseRotatedCraftsman = do
+    string "rotated"
+    craftsman <- between (symbol "(") (symbol ")") parseCraftsman
+    pure $ Rotated craftsman
+  parsePlaceCraftsman = do
+    symbol "place-craftsman"
+    craftsman <- parseRotatedCraftsman <|> (UnRotated <$> parseCraftsman)
+    location  <- parseLocation
+    pure (location, craftsman)
+
+parseRaiseMonuments :: Parser ReligionAndCultureCommand3
+parseRaiseMonuments = fmap (RaiseMonuments . NE.toList) $ many1 $ do
+  symbol "raise-monument"
+  loc      <- parseLocation
+  commands <- many parseRaiseMonumentCommand
+  pure $ (loc, commands)
+ where
+  parseUseHub       = UseHub <$> (symbol "use-hub" *> parseLocation)
+  parseUseCraftsman = do
+    symbol "use-craftsman"
+    UseCraftsman <$> parseLocation <*> parseLocation
+  parseRaiseMonumentCommand = parseUseHub <|> parseUseCraftsman
+
+many1 :: Parser a -> Parser (NonEmpty a)
+many1 p = do
+  a    <- p
+  rest <- optional $ many p
+  pure $ a :| fromMaybe [] rest

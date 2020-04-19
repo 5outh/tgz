@@ -40,6 +40,7 @@ dependencies:
   - cryptonite
   - uuid
   - random
+  - megaparsec
 
 library:
   source-dirs: library

@@ -660,7 +660,7 @@ data RaiseMonumentCommand
   -- ^ Use a hub at some location, utilizing the resource at another location
   | UseCraftsman Location Location
   -- ^ Use a craftsman at some location, utilizing the resource at another location
-  deriving (Show)
+  deriving (Show,Eq)
 
 deriveBoth defaultOptions ''RaiseMonumentCommand
 

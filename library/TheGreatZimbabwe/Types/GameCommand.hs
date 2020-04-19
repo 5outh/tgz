@@ -50,7 +50,6 @@ data ReligionAndCultureMultiCommand = ReligionAndCultureMultiCommand
   , religionAndCultureMultiCommandAction1 :: Maybe ReligionAndCultureCommand1
   , religionAndCultureMultiCommandAction2 :: Maybe UseSpecialist
   , religionAndCultureMultiCommandAction3 :: Maybe ReligionAndCultureCommand3
-  , religionAndCultureMultiCommandEnd     :: Bool
   } deriving (Show, Eq)
 
 deriveBoth (unPrefix "religionAndCultureMultiCommand") ''ReligionAndCultureMultiCommand
