@@ -29,8 +29,6 @@ import           TheGreatZimbabwe.Database.JSONB
 import           TheGreatZimbabwe.Database.User  (UserId)
 import qualified TheGreatZimbabwe.Types          as Types
 
--- TODO administrator id
-
 -- TODO: If we just store an initial seed, we aren't at all beholden to
 -- the database representation of the game *at all*. The game command structure
 -- still matters, but the game structure can be modified willy-nilly. Might be

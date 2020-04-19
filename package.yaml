@@ -11,6 +11,14 @@ category:            Game
 extra-source-files:
 - README.md
 
+
+default-extensions:
+  - DerivingStrategies
+  - GeneralizedNewtypeDeriving
+  - OverloadedStrings
+  - TypeApplications
+  - LambdaCase
+
 dependencies:
   - base >= 4.7 && < 5
   - aeson

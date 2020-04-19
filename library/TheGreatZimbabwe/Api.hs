@@ -8,46 +8,61 @@
 {-# LANGUAGE TypeFamilies          #-}
 module TheGreatZimbabwe.Api where
 
+import           Text.Megaparsec
+import           TheGreatZimbabwe.Types.GameCommand.Parser
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
-import           Crypto.KDF.BCrypt                   (hashPassword,
-                                                      validatePassword)
-import           Data.Aeson                          (FromJSON (..),
-                                                      genericParseJSON, object,
-                                                      (.=))
-import           Data.Bifunctor                      (first)
-import           Data.ByteString                     (ByteString)
-import qualified Data.ByteString.Char8               as B
+import           Crypto.KDF.BCrypt              ( hashPassword
+                                                , validatePassword
+                                                )
+import           Data.Aeson                     ( FromJSON(..)
+                                                , ToJSON(..)
+                                                , genericParseJSON
+                                                , object
+                                                , (.=)
+                                                )
+import           Data.Bifunctor                 ( first )
+import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString.Char8         as B
 import           Data.Pool
-import           Data.Text                           (Text)
-import qualified Data.Text                           as T
-import qualified Data.Text.Lazy                      as TL
-import           Data.Time.Clock                     (getCurrentTime)
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import qualified Data.Text.Lazy                as TL
+import           Data.Time.Clock                ( getCurrentTime )
 import           Database.Persist.Postgresql
-import qualified Database.Persist.Postgresql         as P
+import qualified Database.Persist.Postgresql   as P
 import           Debug.Trace
 import           GHC.Generics
-import           GHC.Int                             (Int64)
+import           GHC.Int                        ( Int64 )
 import           Network.HTTP.Types.Status
-import           Network.Wai                         (pathInfo, requestMethod)
+import           Network.Wai                    ( pathInfo
+                                                , requestMethod
+                                                )
 import           Network.Wai.Middleware.HttpAuth
 import           TheGreatZimbabwe
 import           TheGreatZimbabwe.Aeson
 import           TheGreatZimbabwe.Api.Auth
-import qualified TheGreatZimbabwe.Database.AuthToken as AuthToken
-import qualified TheGreatZimbabwe.Database.Command   as Command
-import qualified TheGreatZimbabwe.Database.Game      as Game
-import qualified TheGreatZimbabwe.Database.GameUser  as GameUser
+import qualified TheGreatZimbabwe.Database.AuthToken
+                                               as AuthToken
+import qualified TheGreatZimbabwe.Database.Command
+                                               as Command
+import qualified TheGreatZimbabwe.Database.Game
+                                               as Game
+import qualified TheGreatZimbabwe.Database.GameUser
+                                               as GameUser
 import           TheGreatZimbabwe.Database.JSONB
-import qualified TheGreatZimbabwe.Database.User      as User
+import qualified TheGreatZimbabwe.Database.User
+                                               as User
 import           TheGreatZimbabwe.Error
 import           TheGreatZimbabwe.NewGame
 import           TheGreatZimbabwe.Types
 import           TheGreatZimbabwe.Types.GameCommand
-import           Web.Scotty                          hiding (get, post)
-import qualified Web.Scotty                          as Scotty
+import           Web.Scotty              hiding ( get
+                                                , post
+                                                )
+import qualified Web.Scotty                    as Scotty
 
 data Signup = Signup
   { signupUsername :: Text
@@ -180,6 +195,9 @@ getGame pool = do
     Just (Left  err          ) -> status forbidden403 *> json err
     Just (Right (_, gameView)) -> status ok200 *> json gameView
 
+newtype GameCommandPayload = GameCommandPayload { command :: Text }
+  deriving newtype (ToJSON, FromJSON)
+
 postPlayerGameCommand pool = do
   gameId        <- toSqlKey . fromIntegral <$> param @Int "gameId"
   -- TODO: mkUsername
@@ -189,26 +207,30 @@ postPlayerGameCommand pool = do
   case mUser of
     Nothing                     -> status notFound404 *> json ()
     Just user@(Entity userId _) -> do
-      preview <- flag "preview"
-      command <- jsonData @GameCommand
-      now     <- liftIO getCurrentTime
+      preview                 <- flag "preview"
+      GameCommandPayload {..} <- jsonData @GameCommandPayload
+      case parse parseGameCommand "command" command of
+        Left e -> status forbidden403
+          *> json (InvalidAction (T.pack $ parseErrorPretty e))
+        Right gameCommand -> do
+          now   <- liftIO getCurrentTime
 
-      mGame   <- runDB pool
-        $ fetchFullGameWith [(User.toPlayerId userId, command)] gameId
+          mGame <- runDB pool
+            $ fetchFullGameWith [(User.toPlayerId userId, gameCommand)] gameId
 
-      case mGame of
-        Nothing                       -> status notFound404 *> json ()
-        Just (Left  err             ) -> status forbidden403 *> json err
-        Just (Right (game, gameView)) -> do
-          let saveCommand = void $ runDB pool $ Command.insertGameCommand
-                (entityKey game)
-                (entityKey user)
-                now
-                command
-              shouldSave = not preview
+          case mGame of
+            Nothing                       -> status notFound404 *> json ()
+            Just (Left  err             ) -> status forbidden403 *> json err
+            Just (Right (game, gameView)) -> do
+              let saveCommand = void $ runDB pool $ Command.insertGameCommand
+                    (entityKey game)
+                    (entityKey user)
+                    now
+                    gameCommand
+                  shouldSave = not preview
 
-          when shouldSave saveCommand
-          status ok200 *> json gameView
+              when shouldSave saveCommand
+              status ok200 *> json gameView
 
 data PostGame = PostGame
   { postGameUsernames :: [Text]
