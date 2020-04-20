@@ -63,6 +63,10 @@ import           Web.Scotty              hiding ( get
                                                 , post
                                                 )
 import qualified Web.Scotty                    as Scotty
+import           Network.Wai.Middleware.RequestLogger
+                                                ( logStdoutDev )
+import           Network.Wai.Middleware.Cors
+
 
 data Signup = Signup
   { signupUsername :: Text
@@ -94,16 +98,22 @@ authSettings = "TGZ"
 api :: IO ()
 api = do
   --connectionString :: ConnectionString <- getEnv "PG_CONN_STR"
-  runStdoutLoggingT $ withPostgresqlPool devString 10 $ \pool -> do
-    runDB pool $ do
-      runMigration User.migrateAll
-      runMigration Command.migrateAll
-      runMigration Game.migrateAll
-      runMigration GameUser.migrateAll
-      runMigration AuthToken.migrateAll
+  runStdoutLoggingT
+    $ withPostgresqlPool devString 10
+    $ \pool -> do
+        runDB pool $ do
+          runMigration User.migrateAll
+          runMigration Command.migrateAll
+          runMigration Game.migrateAll
+          runMigration GameUser.migrateAll
+          runMigration AuthToken.migrateAll
 
-    liftIO $ scotty 8000 $ do
-      routes pool
+        liftIO
+          $ scotty 8000
+          $ do
+              middleware logStdoutDev
+              -- middleware simpleCors
+              routes pool
 
 -- re-checks the user
 getAuthorizedUser pool = do
@@ -135,8 +145,13 @@ routes pool = do
   httpPost "/games/:gameId/players/:username/commands"
     $ postPlayerGameCommand pool
   httpPost "/games" (postGame pool)
+  httpGet "/users/me"        (getMe pool)
   httpGet "/users/:username" (getUser pool)
   httpGet "/users/:id/games" (getUserGames pool)
+
+getMe pool = do
+  user <- getAuthorizedUser pool
+  status ok200 *> json (User.toView user)
 
 getUser pool = do
   userEntity@(Entity userId user) <- getAuthorizedUser pool

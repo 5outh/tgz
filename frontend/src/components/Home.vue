@@ -1,8 +1,26 @@
 <template>
   <div>
     <h1>Home</h1>
-    {{ token }}
-    {{ usernameText }}
+
+    <ul v-if="this.errors.length > 0">
+      <h3>Errors!</h3>
+      <li v-for="(error, i) in this.errors" :key="i">{{ error }}</li>
+    </ul>
+
+    <p v-if="user">Logged in as {{ user.username }}</p>
+
+    <h3>Games</h3>
+    <ul>
+      <li v-for="(game, i) in this.games" :key="i">
+        <router-link :to="{ name: 'Game', params: { id: game.id } }">{{
+          game.name
+        }}</router-link>
+      </li>
+    </ul>
+
+    <h3>New Game</h3>
+    <span> Game Name (Required): <input type="text" v-model="gameName"/></span>
+    <p>Players (One per line)</p>
     <textarea v-model="usernameText" />
     <button @click="this.createNewGame">New Game</button>
   </div>
@@ -11,21 +29,33 @@
 <script lang="ts">
 import { getAuthToken } from "@/auth";
 import { Component, Prop, Vue } from "vue-property-decorator";
-import { authorizedFetch } from "@/api";
-
-interface Game {
-  waterTiles: number;
-}
+import { authorizedFetch, fetchMe, fetchGames } from "@/api";
+import type { User, GameView } from "@/types"
+import {UserV} from "@/types"
+import { pipe } from 'fp-ts/lib/pipeable'
+import { fold, bimap } from 'fp-ts/lib/Either'
+import { PathReporter } from 'io-ts/lib/PathReporter'
+import * as t from 'io-ts'
 
 @Component
 export default class Home extends Vue {
   @Prop({ required: true }) readonly userId!: number;
   private token: string | null = null;
-  private games: Array<Game> = [];
+  private games: Array<GameView> = [];
+  private errors: Array<string> = [];
   private usernameText: string = "";
+  private gameName: string = "";
+  private user: User | null = null;
 
   mounted() {
-    const self = this;
+    this.setup();
+  }
+
+  private reportErrors(a: any) {
+    this.errors = this.errors.concat(PathReporter.report(a))
+  }
+
+  private async setup() {
     const token = getAuthToken();
 
     if (token === null || token === undefined) {
@@ -33,42 +63,27 @@ export default class Home extends Vue {
     }
     this.token = token;
 
-    this.fetchGames(this.userId, token)
-      .then((games: Array<Game>) => {
-        self.games = games;
-      })
-      .catch(console.error);
+    const games = await fetchGames(this.userId);
+    bimap(() => this.reportErrors(games), (a: Array<GameView>) => { this.games = a })(games)
+
+    const me = await fetchMe();
+    bimap(() => this.reportErrors(me), (a: User) => { this.user = a })(me)
   }
 
-  private createNewGame() {
+  private async createNewGame() {
     const users = this.usernameText.split("\n");
-    if (this.token) {
-      console.log(users);
-      this.newGame(users, this.token).then(console.log);
+
+    if (this.token && this.gameName) {
+      const game = await this.newGame(users, this.gameName)
+      this.$router.push(`/games/${game.id}`)
     }
   }
 
-  private updateUsernames() {
-    alert("usernames");
-  }
-
-  private newGame(usernames: Array<string>, token: string): Promise<Game> {
-    return authorizedFetch(`http://localhost:8000/games`, token, {
+  private newGame(usernames: Array<string>, gameName: string): Promise<GameView> {
+    return authorizedFetch(`http://localhost:8000/games`, {
       method: "POST",
-      body: JSON.stringify({ usernames, name: "TODO" })
+      body: JSON.stringify({ usernames, name: gameName })
     }).then((response: Response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    });
-  }
-
-  private fetchGames(userId: number, token: string): Promise<Array<Game>> {
-    return authorizedFetch(
-      `http://localhost:8000/users/${this.userId}/games`,
-      token
-    ).then((response: Response) => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -82,14 +97,6 @@ export default class Home extends Vue {
 <style scoped>
 h3 {
   margin: 40px 0 0;
-}
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-li {
-  display: inline-block;
-  margin: 0 10px;
 }
 a {
   color: #42b983;

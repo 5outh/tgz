@@ -13,6 +13,7 @@
 
 <script>
 import { setAuthToken } from "@/auth";
+import { authorizedFetch } from "@/api";
 export default {
   name: "SignupForm",
   data: function() {
@@ -41,8 +42,21 @@ export default {
         })
         .then(data => {
           setAuthToken(data.token);
-          this.$router.push("/");
-        });
+        })
+        .then(() => {
+          return authorizedFetch("http://localhost:8000/users/me");
+        })
+        .then(response => {
+          if (!response.ok) {
+            console.log({ response });
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          this.$router.push(`/home/${data.id}`);
+        })
+        .catch(alert);
     }
   }
 };

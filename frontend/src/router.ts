@@ -20,10 +20,10 @@ export default new Router({
       component: LoginForm
     },
     {
-      path: "/",
+      path: "/home/:id",
       name: "Home",
       component: Home,
-      props: { userId: 18 } // TODO: Fix
+      props: route => ({ userId: route.params.id })
     },
     {
       path: "/games/:id",

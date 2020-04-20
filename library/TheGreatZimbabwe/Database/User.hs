@@ -32,6 +32,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     password  ByteString
     UniqueEmail email
     UniqueUsername username
+    deriving Show
 |]
 
 toPlayerId :: UserId -> PlayerId

@@ -1,10 +1,8 @@
 <template>
   <div>
-    <h1>{{ game.name }}</h1>
+    <h1 v-if="game">{{ game.name }}</h1>
     <canvas id="game-canvas" />
-    <ul>
-      <li v-for="error in errors" :key="error">{{ error }}</li>
-    </ul>
+    <command-input />
   </div>
 </template>
 
@@ -14,12 +12,20 @@ import { Component, Vue, Prop } from "vue-property-decorator";
 import { authorizedFetch } from "@/api";
 import type { GameView } from "@/types"
 import { GameViewV } from "@/types";
+import CommandInput from "@/components/CommandInput.vue";
 import { pipe } from 'fp-ts/lib/pipeable'
 import { fold } from 'fp-ts/lib/Either'
 import { PathReporter } from 'io-ts/lib/PathReporter'
 import * as t from 'io-ts'
 
 @Component
+
+@Component({
+  name: 'GameCanvas',
+  components: {
+    'command-input': CommandInput
+  }
+})
 export default class GameCanvas extends Vue {
   @Prop({required: true}) readonly game!: GameView
   private token: string | null = null;
@@ -27,25 +33,23 @@ export default class GameCanvas extends Vue {
   private errors: Array<string> = [];
 
   mounted() {
-    const token = getAuthToken();
-    if (token === null || token === undefined) {
-      return;
+    const ctx = this.getGameCanvasContext()
+    if (ctx) {
+      renderMapLayout(ctx, this.game.state.map_layout)
     }
-    this.token = token;
-    renderMapLayout(this.getGameCanvasContext(), this.game.state.map_layout)
   }
 
-  private getGameCanvasContext(): CanvasRenderingContext2D {
+  private getGameCanvasContext(): CanvasRenderingContext2D | null {
     const canvas : any = document.getElementById("game-canvas");
     if (!canvas) {
       this.errors.push("Canvas is missing")
-      throw new Error("Canvas is missing");
+      return null;
     }
     let ctx = canvas.getContext("2d");
 
     if (!ctx) {
       this.errors.push("Canvas context is missing");
-      throw new Error("Canvas context is missing");
+      return null;
     }
 
     ctx.textAlign = "center";

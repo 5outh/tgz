@@ -166,3 +166,10 @@ export const GameViewV = t.type({
   state: GameV,
 }, "GameView")
 export type GameView = t.TypeOf<typeof GameViewV>
+
+export const UserV = t.type({
+  id: t.number,
+  username: t.string,
+  email: t.string
+})
+export type User = t.TypeOf<typeof UserV>

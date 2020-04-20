@@ -49,6 +49,7 @@ dependencies:
   - uuid
   - random
   - megaparsec
+  - wai-cors
 
 library:
   source-dirs: library
